@@ -1,3 +1,4 @@
+# TODO: Add script description
 """
 This module is an example of a barebones QWidget plugin for napari
 
@@ -98,6 +99,7 @@ class LayerSelector(QWidget):
                         self.selected_layers.append(layer)
 
 
+# TODO: Add in code documentation for VoxelPlotter class and methods
 class VoxelPlotter(QWidget):
 
     def __init__(self, napari_viewer,):
@@ -129,7 +131,7 @@ class VoxelPlotter(QWidget):
                 cursor_pos = np.round(viewer.cursor.position)
 
                 # get selected layers form layer selector
-                selected_layers = self.viewer.window._dock_widgets['Data Selector'].widget().selected_layers
+                selected_layers = self.viewer.window._dock_widgets['Layer Selector'].widget().selected_layers
 
                 # clear active plot
                 self.ax.cla()
@@ -163,24 +165,8 @@ class VoxelPlotter(QWidget):
 
 viewer = napari.Viewer()
 
+
 @napari_hook_implementation
 def napari_experimental_provide_dock_widget():
     # you can return either a single widget, or a sequence of widgets
     return [LayerSelector, VoxelPlotter]
-
-# TODO: Test Section -> has to be removed in the next commits
-layerselector = LayerSelector(viewer)
-plotter = VoxelPlotter(viewer)
-viewer.window.add_dock_widget(layerselector, name='Data Selector', area='right')
-
-test_arr1 = np.random.randint(500, size=(2, 100, 100, 100, 100))
-test_arr2 = np.random.randint(1000, size=(100, 100, 100, 100))
-test_arr3 = np.random.randint(1000, 2000, size=(100, 100, 100))
-test_arr4 = np.random.randint(-1000, 0, size=(100, 100))
-
-viewer.add_image(test_arr1, name='5D')
-viewer.add_image(test_arr2, name='4D')
-viewer.add_image(test_arr3, name='3D')
-viewer.add_image(test_arr4, name='2D')
-
-napari.run()
