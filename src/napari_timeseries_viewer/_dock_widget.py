@@ -25,7 +25,7 @@ class LayerSelector(QWidget):
     if layers are added or removed. The class stores references to layers of checked boxes in self.selected_layers for
     access from the outside.
 
-    :param napari_viewer: Napari viewer instance, input should be handeled by the napari_hook_implementation decoration
+    :param napari_viewer: Napari viewer instance, input should be handled by the napari_hook_implementation decoration
     :type napari_viewer: napari.Viewer() object
     """
     def __init__(self, napari_viewer):
@@ -121,18 +121,7 @@ class VoxelPlotter(QWidget):
         @self.viewer.mouse_move_callbacks.append
         def plot_voxel_callback(viewer, event):
             """Mouse movement callback function.
-            If hovering the mouse over a voxel while holding 'Shift' a docked plot widget will display the
-            S(TI) values of the voxel and a model curve for a range of TI values. The data is selected from
-            the viewer.active_layer. The layer data is split into the S[TI] values (arr[:n[TI],...]), Sinf
-            map (arr[-3,...]), M0 map (arr[-2,...]) and the T1 map (arr[-1,...]). If the voxel contains no
-            Sinf, M0 or T1 values (value = 0) no model curve will be displayed.
 
-            :params viewer: Napari Viewer object, input will be handled by the decorator.
-            :params event: QT event, input will be handled by the decorator.
-            inversion_times: Global variable initiated outside of the function, tuple of TI values in
-                milliseconds.
-            fig: Global variable initiated outside of the function, matplotlib Figure object.
-            ax: Global variable initiated outside of the function, matplotlib Axe object.
             """
 
             if 'Shift' in event.modifiers:
