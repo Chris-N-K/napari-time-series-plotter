@@ -7,7 +7,7 @@
 [![codecov](https://codecov.io/gh/ch-n/napari-timeseries_viewer/branch/main/graph/badge.svg)](https://codecov.io/gh/ch-n/napari-timeseries_viewer)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-timeseries_viewer)](https://napari-hub.org/plugins/napari-timeseries_viewer)
 
-A Pugin for napari to visualize pixel values over the first dimension (time -> t+3D, t+2D) as graphs.
+A Pugin for napari to visualize pixel / voxel values over the first dimension (time -> t+3D, t+2D) as graphs.
 
 ----------------------------------
 
@@ -22,6 +22,7 @@ https://napari.org/docs/plugins/index.html
 -->
 
 ## Installation
+**! Not yet on pypi --> clone repo !**
 
 You can install `napari-timeseries_viewer` via [pip]:
 
@@ -33,6 +34,14 @@ To install latest development version :
 
     pip install git+https://github.com/ch-n/napari-timeseries_viewer.git
 
+
+## ToDo
+- [ ] Add usage instructions to README
+- [ ] Add gif highlighting usage to README
+- [ ] Complete unit tests
+- [ ] Complete in code documentation
+- [ ] Add Sphinx documentation
+- [ ] Prepare for PyPi
 
 ## Contributing
 
