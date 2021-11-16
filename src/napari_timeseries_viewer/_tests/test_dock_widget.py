@@ -1,18 +1,67 @@
-import napari_timeseries_viewer
+from napari_timeseries_viewer._dock_widget import LayerSelector, VoxelPlotter
 import pytest
+import numpy as np
 
-# this is your plugin name declared in your napari.plugins entry point
-MY_PLUGIN_NAME = "napari-timeseries_viewer"
-# the name of your widget(s)
-MY_WIDGET_NAMES = ["Example Q Widget", "example_magic_widget"]
+# fixture for LayerSelector class tests
+@pytest.fixture
+def selector(make_napari_viewer):
+    viewer = make_napari_viewer(show=False)
+    viewer.add_image(np.random.rand(10, 10), name='2D')
+    viewer.add_image(np.random.rand(10, 10, 10), name='3D')
+    yield LayerSelector(viewer)
 
 
-@pytest.mark.parametrize("widget_name", MY_WIDGET_NAMES)
-def test_something_with_viewer(widget_name, make_napari_viewer, napari_plugin_manager):
-    napari_plugin_manager.register(napari_timeseries_viewer, name=MY_PLUGIN_NAME)
-    viewer = make_napari_viewer()
-    num_dw = len(viewer.window._dock_widgets)
-    viewer.window.add_plugin_dock_widget(
-        plugin_name=MY_PLUGIN_NAME, widget_name=widget_name
-    )
-    assert len(viewer.window._dock_widgets) == num_dw + 1
+# fixture for VoxelPlotter class tests
+@pytest.fixture
+def plotter(make_napari_viewer):
+    viewer = make_napari_viewer(show=False)
+    viewer.add_image(np.random.rand(10, 10), name='2D')
+    viewer.add_image(np.random.rand(10, 10, 10), name='3D')
+    viewer.add_image(np.random.rand(10, 10, 10, 10), name='4D')
+    viewer.add_image(np.random.rand(10, 10, 10, 10, 10), name='5D')
+    layerselector = LayerSelector(viewer)
+    yield VoxelPlotter(viewer)
+
+
+# test LayerSelector
+# the widget should already contain four checkboxes named after the layers of viewer
+def test_selector(selector: LayerSelector):
+    assert selector.windowTitle() == 'Layer Selector'
+    layers = [layer.name for layer in selector.viewer.layers]
+    cboxes = [cb.text() for cb in selector._cboxes]
+    assert all([lname == cbname for lname, cbname in zip(layers, cboxes)])
+
+
+# when a layer is added to the viewer a new checkbox should appear
+def test_selector_add_layer(selector: LayerSelector):
+    assert len(selector._cboxes) == 2
+    selector.viewer.add_image(np.random.rand(10, 10))
+    assert len(selector._cboxes) == 3
+
+
+# when a layer is removed from the viewer the corresponding checkbox should be removed
+def test_selector_remove_layer(selector: LayerSelector):
+    assert len(selector._cboxes) == 2
+    selector.viewer.layers.remove('2D')
+    assert len(selector._cboxes) == 1
+
+
+# test if the state of the checkboxes is correctly translated
+def test_selector_select_layer(selector: LayerSelector):
+    # initially no boxes should be checked and selected_layers should be empty
+    assert not all([cb.isChecked() for cb in selector._cboxes])
+    assert not selector.selected_layers
+
+    # after checking the boxes selected_layers should contain all viewer layers corresponding to the checked boxes
+    for cb in selector._cboxes[:1]:
+        cb.setChecked(True)
+    # two layers selected?
+    assert len(selector.selected_layers) == 1
+    # where the right layers selected?
+    assert all([slayer == vlayer for slayer, vlayer in zip(selector.selected_layers, selector.viewer.layers[:1])])
+
+
+# TODO: Add VoxelPlotter tests
+# test VoxelPlotter
+'''def test_plotter(plotter: VoxelPlotter):
+    assert plotter.windowTitle() == 'Voxel Plotter''''
