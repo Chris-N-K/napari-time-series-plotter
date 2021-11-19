@@ -7,7 +7,7 @@
 [![codecov](https://codecov.io/gh/ch-n/napari-timeseries_viewer/branch/main/graph/badge.svg)](https://codecov.io/gh/ch-n/napari-timeseries_viewer)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-timeseries_viewer)](https://napari-hub.org/plugins/napari-timeseries_viewer)
 
-A Pugin for napari to visualize pixel / voxel values over the first dimension (time -> t+3D, t+2D) as graphs.
+A Plugin for napari to visualize pixel / voxel values over the first dimension (time -> t+3D, t+2D) as graphs.
 
 ----------------------------------
 

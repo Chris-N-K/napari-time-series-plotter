@@ -2,6 +2,7 @@ from napari_timeseries_viewer._dock_widget import LayerSelector, VoxelPlotter
 import pytest
 import numpy as np
 
+
 # fixture for LayerSelector class tests
 @pytest.fixture
 def selector(make_napari_viewer):
@@ -19,7 +20,8 @@ def plotter(make_napari_viewer):
     viewer.add_image(np.random.rand(10, 10, 10), name='3D')
     viewer.add_image(np.random.rand(10, 10, 10, 10), name='4D')
     viewer.add_image(np.random.rand(10, 10, 10, 10, 10), name='5D')
-    layerselector = LayerSelector(viewer)
+    layer_selector = LayerSelector(viewer)
+    viewer.window.add_dock_widget(layer_selector, name='Layer Selector', area='right')
     yield VoxelPlotter(viewer)
 
 
@@ -63,5 +65,8 @@ def test_selector_select_layer(selector: LayerSelector):
 
 # TODO: Add VoxelPlotter tests
 # test VoxelPlotter
-'''def test_plotter(plotter: VoxelPlotter):
-    assert plotter.windowTitle() == 'Voxel Plotter''''
+def test_plotter(plotter: VoxelPlotter):
+    # spawned mpl_widget and added to viewer?
+    assert 'Voxel Plotter' in plotter.viewer.window._dock_widgets
+    assert plotter.fig
+    assert plotter.ax

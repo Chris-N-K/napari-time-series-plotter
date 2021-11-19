@@ -1,5 +1,13 @@
 # The requirements listed here are for development. 
 # Requirements of your napari plugin should be listed in setup.cfg
 # See also: https://caremad.io/posts/2013/07/setup-vs-requirement/
+--index-url https://pypi.python.org/simple/
 
 -e .
+
+# development requirements
+matplotlib==3.4.3
+napari_plugin_engine==0.2.0
+numpy==1.21.4
+pytest==6.2.5
+qtpy==1.11.2

@@ -1,6 +1,6 @@
 # TODO: Add script description
 """
-This module is an example of a barebones QWidget plugin for napari
+This module is an example of a bare bones QWidget plugin for napari
 
 It implements the ``napari_experimental_provide_dock_widget`` hook specification.
 see: https://napari.org/docs/dev/plugins/hook_specifications.html
@@ -10,7 +10,6 @@ Replace code below according to your needs.
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 
-import napari
 import numpy as np
 import warnings
 
@@ -100,20 +99,23 @@ class LayerSelector(QWidget):
 
 
 # TODO: Add in code documentation for VoxelPlotter class and methods
-class VoxelPlotter(QWidget):
+class VoxelPlotter:
 
     def __init__(self, napari_viewer,):
         super().__init__()
         self.viewer = napari_viewer
+        self._initMPL()
 
+    def _initMPL(self):
         # set up figure and axe objects
         self.fig = plt.figure(figsize=(5, 5))
         self.ax = self.fig.add_subplot(111)
         self.fig.patch.set_facecolor('white')
         self.ax.annotate('Hold "Shift" while moving over the image'
                          '\nto plot pixel signal over time',
-                         (25, 150),
-                         xycoords='figure points',
+                         (0.5, 0.5),
+                         ha='center',
+                         va='center',
                          size=15,
                          bbox=dict(facecolor=(0.9, 0.9, 0.9), alpha=1, boxstyle='square'))
         mpl_widget = FigureCanvas(self.fig)
@@ -144,7 +146,7 @@ class VoxelPlotter(QWidget):
                     data = layer.data
 
                     if 3 > ndim or ndim > 4:
-                        warnings.warn(f'Only layers with thre or four dimensions are supported.'
+                        warnings.warn(f'Only layers with three or four dimensions are supported.'
                                       f'\nSelected layer: {lname}, has {ndim} dimensions.')
                     else:
                         # extract voxel time series
@@ -161,9 +163,6 @@ class VoxelPlotter(QWidget):
                 self.fig.canvas.draw()
                 plt.tight_layout()
             plt.close()
-
-
-viewer = napari.Viewer()
 
 
 @napari_hook_implementation
