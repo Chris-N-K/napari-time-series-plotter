@@ -83,3 +83,6 @@ venv/
 # written by setuptools_scm
 **/_version.py
 
+# plugin dev tests
+run_plugin.py
+run_callback_test.py
