@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# napari-timeseries_viewer documentation build configuration file, created by
+# napari-time_series_plotter documentation build configuration file, created by
 # sphinx-quickstart on Thu Oct  1 00:43:18 2015.
 #
 # This file is execfile()d with the current directory set to its
@@ -48,7 +48,7 @@ source_suffix = '.rst'
 main_doc = 'index'
 
 # General information about the project.
-project = u'napari-timeseries_viewer'
+project = u'napari-time_series_plotter'
 copyright = u'2015, Christopher Nauroth-Kress'
 author = u'Christopher Nauroth-Kress'
 
@@ -255,7 +255,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (main_doc, 'napari-cookiecutterplugin_name', u'napari-timeseries_viewer Documentation',
+    (main_doc, 'napari-cookiecutterplugin_name', u'napari-time_series_plotter Documentation',
      [author], 1)
 ]
 
@@ -269,7 +269,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  (main_doc, 'napari-cookiecutterplugin_name', u'napari-timeseries_viewer Documentation',
+  (main_doc, 'napari-cookiecutterplugin_name', u'napari-time_series_plotter Documentation',
    author, 'napari-cookiecutterplugin_name', 'One line description of project.',
    'Miscellaneous'),
 ]

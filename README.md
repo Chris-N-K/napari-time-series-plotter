@@ -1,11 +1,11 @@
-# napari-timeseries_viewer
+# napari-time_series_plotter
 
-[![License](https://img.shields.io/pypi/l/napari-timeseries_viewer.svg?color=green)](https://github.com/ch-n/napari-timeseries_viewer/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari-timeseries_viewer.svg?color=green)](https://pypi.org/project/napari-timeseries_viewer)
-[![Python Version](https://img.shields.io/pypi/pyversions/napari-timeseries_viewer.svg?color=green)](https://python.org)
-[![tests](https://github.com/ch-n/napari-timeseries_viewer/workflows/tests/badge.svg)](https://github.com/ch-n/napari-timeseries_viewer/actions)
-[![codecov](https://codecov.io/gh/ch-n/napari-timeseries_viewer/branch/main/graph/badge.svg)](https://codecov.io/gh/ch-n/napari-timeseries_viewer)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-timeseries_viewer)](https://napari-hub.org/plugins/napari-timeseries_viewer)
+[![License](https://img.shields.io/pypi/l/napari-time_series_plotter.svg?color=green)](https://github.com/ch-n/napari-time_series_plotter/raw/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/napari-time_series_plotter.svg?color=green)](https://pypi.org/project/napari-time_series_plotter)
+[![Python Version](https://img.shields.io/pypi/pyversions/napari-time_series_plotter.svg?color=green)](https://python.org)
+[![tests](https://github.com/ch-n/napari-time_series_plotter/workflows/tests/badge.svg)](https://github.com/ch-n/napari-time_series_plotter/actions)
+[![codecov](https://codecov.io/gh/ch-n/napari-time_series_plotter/branch/main/graph/badge.svg)](https://codecov.io/gh/ch-n/napari-time_series_plotter)
+[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-time_series_plotter)](https://napari-hub.org/plugins/napari-time_series_plotter)
 
 A Plugin for napari to visualize pixel / voxel values over the first dimension (time -> t+3D, t+2D) as graphs.
 
@@ -24,22 +24,22 @@ https://napari.org/docs/plugins/index.html
 ## Installation
 **! Not yet on pypi --> clone repo !**
 
-You can install `napari-timeseries_viewer` via [pip]:
+You can install `napari-time_series_plotter` via [pip]:
 
-    pip install napari-timeseries_viewer
+    pip install napari-time_series_plotter
 
 
 
 To install latest development version :
 
-    pip install git+https://github.com/ch-n/napari-timeseries_viewer.git
+    pip install git+https://github.com/ch-n/napari-time_series_plotter.git
 
 ## Usage
 After installation the plugin adds two widgets to the viewer, one is for selecting the layers you want to examine and the other contains the plot.
 
 If you selected at least one layer, moving your mouse over the image while holing shift will display the time series data of the hovered voxel as a graph in the plot widget. In the upper right corner a legend with the layer names will be displayed.
 
-![Alt Text](https://github.com/ch-n/napari-timeseries_viewer/blob/main/Usage.gif)
+![Alt Text](https://github.com/ch-n/napari-time_series_plotter/blob/main/Usage.gif)
 
 Only 3D and 4D images are supported. Selecting a layer of different dimensionality will result in a waring without plotting anything.
 
@@ -59,7 +59,7 @@ the coverage at least stays the same before you submit a pull request.
 ## License
 
 Distributed under the terms of the [BSD-3] license,
-"napari-timeseries_viewer" is free and open source software
+"napari-time_series_plotter" is free and open source software
 
 ## Issues
 
@@ -76,7 +76,7 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [Mozilla Public License 2.0]: https://www.mozilla.org/media/MPL/2.0/index.txt
 [cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
 
-[file an issue]: https://github.com/ch-n/napari-timeseries_viewer/issues
+[file an issue]: https://github.com/ch-n/napari-time_series_plotter/issues
 
 [napari]: https://github.com/napari/napari
 [tox]: https://tox.readthedocs.io/en/latest/
