@@ -24,7 +24,7 @@ https://napari.org/docs/plugins/index.html
 ## Installation
 You can install `napari-time_series_plotter` via [pip]:
 
-    pip install napari-time_series_plotter
+    pip install napari-time-series-plotter
 
 
 
