@@ -47,7 +47,7 @@ Only 3D and 4D images are supported. Selecting a layer of different dimensionali
 - [X] Complete unit tests
 - [X] Complete in code documentation
 - [ ] Add Sphinx documentation
-- [ ] Upload to PyPi
+- [X] Upload to PyPi
 
 ## Contributing
 
