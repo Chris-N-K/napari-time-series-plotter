@@ -134,7 +134,6 @@ class LayerSelector(QWidget):
         self.sync.signal.emit(self.selected_layers)
 
 
-# TODO: Add in code documentation for VoxelPlotter class and methods
 class VoxelPlotter(QDialog):
     """QWidget for plotting.
 
