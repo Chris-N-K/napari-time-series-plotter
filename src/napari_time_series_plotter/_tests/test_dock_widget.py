@@ -1,3 +1,6 @@
+"""
+Napari-time_series_plotter test module.
+"""
 from napari_time_series_plotter._dock_widget import *
 import pytest
 import numpy as np
@@ -88,7 +91,7 @@ def test_plotter_layer_selection_update(plotter: VoxelPlotter):
     # at start no layers should be selected
     assert not plotter.selected_layers
 
-    # TODO: find more optimal solution for the signal test
+    # TODO: find better solution for signal test
     # if a signal was detected selected_layers should be updated
     layers = plotter.viewer.layers
     mock_selected_layers = [layers['3D'], layers['4D']]
@@ -96,35 +99,78 @@ def test_plotter_layer_selection_update(plotter: VoxelPlotter):
     assert plotter.selected_layers == mock_selected_layers
 
 
-# TODO: write test for the plot voxel callback
-def test_plotter_plot_voxel_callback(plotter: VoxelPlotter):
-    pass
+def test_plotter_plot_voxel_callback(plotter: VoxelPlotter, monkeypatch):
+    # mock classes
+    class Event:
+        modifiers = {'Shift'}
+
+    class Layer:
+        name = '4D'
+
+    class Cursor:
+        position = [0, 3, 12, 17]
+
+    class Viewer:
+        cursor = Cursor
+
+    event = Event()
+    layer = Layer()
+    viewer = Viewer()
+
+    monkeypatch.setattr(plotter, 'selected_layers', [layer])
+
+    # mock functions
+    def mock_extract_voxel_time_series_pos(*args):
+        return (0, 3, 12, 17), list(range(10))
+
+    def mock_extract_voxel_time_series_neg(*args):
+        return (0, 3, 12, 17), None
+
+    # should have start up figure with empty axes
+    assert not plotter.ax.get_title()
+    assert not plotter.ax.get_xlabel()
+    assert not plotter.ax.get_ylabel()
+
+    # _extract_voxel_time_series data return should draw new axes
+    monkeypatch.setattr(plotter, '_extract_voxel_time_series', mock_extract_voxel_time_series_pos)
+    plotter._plot_voxel_callback(viewer, event)
+    assert plotter.ax.get_title() == 'Series [:, 3, 12, 17]'
+    assert plotter.ax.get_xlabel() == 'Time'
+    assert plotter.ax.get_ylabel() == 'Pixel / Voxel Values'
+    assert len(plotter.ax.get_legend().get_texts())
+
+    # _extract_voxel_time_series data return should delete axes
+    monkeypatch.setattr(plotter, '_extract_voxel_time_series', mock_extract_voxel_time_series_neg)
+    plotter._plot_voxel_callback(viewer, event)
+    assert not plotter.ax.get_title()
+    assert not plotter.ax.get_xlabel()
+    assert not plotter.ax.get_ylabel()
+    assert not len(plotter.ax.get_legend().get_texts())
 
 
-# test functions
-def test_extract_voxel_time_series(make_napari_viewer, monkeypatch):
-    viewer = make_napari_viewer(show=False)
-    viewer.add_image(np.random.rand(10, 10, 10, 10), name='4D')
-
+def test_extract_voxel_time_series(plotter: VoxelPlotter, monkeypatch):
     # mock cursor position
-    cursor_pos_1 = [3, 7, 3, 1]
-    cursor_pos_2 = [3, -3, 5, 2]
+    cursor_pos_1 = np.array([3.2, 7.1, 2.9, 1.0])
+    cursor_pos_2 = np.array([3.1, -3.4, 5.0, 2.7])
 
     # select layers
-    layer = viewer.layers['4D']
+    layer = plotter.viewer.layers['4D']
 
     # mock data at [:, 7, 3, 1]
     mock_data = [i for i in range(layer.data.shape[0])]
     layer.data[:, 7, 3, 1] = mock_data
 
     # extracted data should be equal mock data
-    vts = extract_voxel_time_series(cursor_pos_1, layer)
+    ind, vts = plotter._extract_voxel_time_series(cursor_pos_1, layer)
+    assert ind == (3, 7, 3, 1)
     assert np.all(vts == mock_data)
 
     # cursor position outside of the array index should yield no data
-    vts = extract_voxel_time_series(cursor_pos_2, layer)
+    ind, vts = plotter._extract_voxel_time_series(cursor_pos_2, layer)
+    assert ind == (3, -3, 5, 3)
     assert not vts
 
 
+# test functions
 def test_napari_experimental_provide_dock_widget():
     assert all([a == b for a, b in zip([LayerSelector, VoxelPlotter], napari_experimental_provide_dock_widget())])
