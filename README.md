@@ -39,17 +39,17 @@ After installation the plugin adds two widgets to the viewer, one is for selecti
 
 If you selected at least one layer, moving your mouse over the image while holing shift will display the time series data of the hovered voxel as a graph in the plot widget. In the upper right corner a legend with the layer names will be displayed.
 
-![Alt Text](https://github.com/ch-n/napari-time_series_plotter/blob/main/Usage.gif)
+![Usage Gif](https://github.com/ch-n/napari-time_series_plotter/blob/main/Usage.gif)
 
 Only 3D and 4D images are supported. Selecting a layer of different dimensionality will result in a waring without plotting anything.
 
 ## ToDo
 - [X] Add simple usage instructions to README
 - [X] Add gif highlighting usage to README
-- [ ] Complete unit tests
-- [ ] Complete in code documentation
+- [X] Complete unit tests
+- [X] Complete in code documentation
 - [ ] Add Sphinx documentation
-- [ ] Prepare for PyPi
+- [ ] Upload to PyPi
 
 ## Contributing
 
