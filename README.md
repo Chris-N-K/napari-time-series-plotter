@@ -39,7 +39,7 @@ If you selected at least one layer, moving your mouse over the image while holin
 
 ![Usage Gif](https://github.com/ch-n/napari-time_series_plotter/raw/main/Usage.gif)
 
-Only 3D and 4D images are supported. Selecting a layer of different dimensionality will result in a waring without plotting anything.
+Only 3D and 4D images are supported. Selecting a layer of different dimensionality will result in a warning without plotting anything.
 
 ## ToDo
 - [X] Add simple usage instructions to README
