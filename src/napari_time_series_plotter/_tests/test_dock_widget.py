@@ -174,3 +174,23 @@ def test_extract_voxel_time_series(plotter: VoxelPlotter, monkeypatch):
 # test functions
 def test_napari_experimental_provide_dock_widget():
     assert all([a == b for a, b in zip([LayerSelector, VoxelPlotter], napari_experimental_provide_dock_widget())])
+
+
+def test_tspcheckbox():
+    class MockLayer:
+        name = 'test'
+    mocklayer = MockLayer()
+    checkbox = TSPCheckBox(mocklayer)
+    # should have text 'test'
+    assert checkbox.text() == 'test'
+
+
+def test_tspcheckbox_rename():
+    class MockLayer:
+        name = 'test'
+    mocklayer = MockLayer()
+    checkbox = TSPCheckBox(mocklayer)
+    # rename layer and trigger rename of checkbox
+    mocklayer.name = 'testtest'
+    checkbox.rename(None)
+    assert checkbox.text() == 'testtest'

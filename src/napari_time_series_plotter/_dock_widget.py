@@ -13,6 +13,7 @@ The widgets are send to the viewer through the ``napari_experimental_provide_doc
 see: https://napari.org/docs/dev/plugins/hook_specifications.html
 """
 import matplotlib
+import napari.layers
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 # from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -23,7 +24,9 @@ from napari_plugin_engine import napari_hook_implementation
 import numpy as np
 
 from qtpy.QtCore import Signal, Slot, QObject
-from qtpy.QtWidgets import QDialog, QWidget, QCheckBox, QVBoxLayout
+from qtpy.QtWidgets import QDialog, QWidget, QVBoxLayout
+
+from ._widgets import TSPCheckBox
 
 matplotlib.use('QT5Agg')
 
@@ -40,8 +43,11 @@ class Sync(QObject):
 
 
 def get_sync():
-    """
-    Registers a Sync instance to a QWidget. If there is no global Sync instance a new will be spawned.
+    """Registers a Sync instance to a QWidget. If there is no global Sync instance a new will be spawned.
+
+    Generates a global Sync object if none exists. Otherwise returns the global one.
+
+    :returns: napari_time_series_plotter._dock_widget.Sync
     """
     global _sync
     if _sync is None:
@@ -58,11 +64,13 @@ class LayerSelector(QWidget):
     removed or added to the widget if valid layers are added or removed. The class stores references to layers of
     checked boxes in self.selected_layers for access from the outside.
     The class connects to an instance of the Sync class for widget to widget communication.
-
-    :param napari_viewer: Napari viewer instance, input should be handled by the napari_hook_implementation decoration
-    :type napari_viewer: napari.viewer.Viewer
     """
     def __init__(self, napari_viewer):
+        """Initialise instance.
+
+        :param napari_viewer: Napari viewer instance, input should be handled by the napari_hook_implementation decoration
+        :type napari_viewer: napari.viewer.Viewer
+        """
         super().__init__()
         self.viewer = napari_viewer
         self.selected_layers = []
@@ -75,7 +83,7 @@ class LayerSelector(QWidget):
         self.viewer.layers.events.inserted.connect(self._add_cb)
 
     def _init_ui(self):
-        """Method to initialise the LayerSelector widget UI.
+        """Initialise the LayerSelector widget UI.
 
         This method generates a pyqt.QVBoxLayout and executes the _add_cb() method to populate it with pyqt.QCheckboxes.
         _add_cb() is connected to the napari.Viewer.layers.events.inserted event and _remove_cb() to
@@ -87,26 +95,25 @@ class LayerSelector(QWidget):
         # create check boxes
         self.setLayout(self.vbox)
         self.setWindowTitle('Layer Selector')
-        self._add_cb()
+        self._add_cb(None)
 
-    def _add_cb(self, *args):
-        """Method to add a pyqt.QCheckBox to the LayerSelector object.
+    def _add_cb(self, event):
+        """Add a TSP_CheckBox to the instance.
 
         The method scans the LayerSelector object for active pyqt.QCheckboxes and the list of layers in the napari
         viewer instance. For layers not corresponding to any existing pyqt.QCheckboxes new widgets are added.
-        The method accepts additional arguments to be compatible with napari viewer event hooks.
         State change events of the checkboxes are connected to the internal _check_states() function.
         """
-        w_names = [cb.text() for cb in self._cboxes]
+        reg_layers = [cb.layer for cb in self._cboxes]
         for layer in self.viewer.layers:
-            if layer.name not in w_names and isinstance(layer, Image):
-                if 5 > layer.ndim > 2:
-                    cb = QCheckBox(layer.name, self)
-                    cb.stateChanged.connect(self._check_states)
-                    self.vbox.addWidget(cb)
-                    self._cboxes.append(cb)
+            if all([layer not in reg_layers, isinstance(layer, Image), 5 > layer.ndim > 2]):
+                cb = TSPCheckBox(layer)
+                cb.stateChanged.connect(self._check_states)
+                cb.layer.events.name.connect(cb.rename)
+                self.vbox.addWidget(cb)
+                self._cboxes.append(cb)
 
-    def _remove_cb(self, *args):
+    def _remove_cb(self, event):
         """Method to add a pyqt.QCheckBox to the LayerSelector object.
 
         The method scans the LayerSelector object for active pyqt.QCheckboxes and the list of layers in
@@ -114,23 +121,18 @@ class LayerSelector(QWidget):
         The method accepts additional arguments to be compatible with napari viewer event hooks.
         """
         for cb in self._cboxes:
-            if cb.text() not in self.viewer.layers:
+            if cb.layer not in self.viewer.layers:
                 cb.deleteLater()
                 self._cboxes.remove(cb)
 
-    def _check_states(self):
+    def _check_states(self, event):
         """Method to check pyqt.QCheckbox states.
 
         This method curates the attribute selected_layers of LayerSelector objects. If called all pyqt.QCheckboxes
         registered in the internal _cboxes list are checked for there current state. If a box's state is checked the
         corresponding napari viewer layers is added to the list of selected layers.
         """
-        self.selected_layers = []
-        for cb in self._cboxes:
-            if cb.isChecked():
-                for layer in self.viewer.layers:
-                    if layer.name == cb.text():
-                        self.selected_layers.append(layer)
+        self.selected_layers = [cb.layer for cb in self._cboxes if cb.isChecked()]
         self.sync.signal.emit(self.selected_layers)
 
 
@@ -144,13 +146,15 @@ class VoxelPlotter(QDialog):
     Upon initialisation the class connects (self._sync) to an instance of the Sync class for widget to widget
     communication. Every time an instance of the class receives a signal through self._sync self.selected_layers will be
     updated.
-
-    :param napari_viewer: Napari viewer instance, input should be handled by the napari_hook_implementation decoration
-    :type napari_viewer: napari.viewer.Viewer
-    :param parent: Parent widget, optional
-    :type parent: qtpy.QtWidgets.QWidget
     """
     def __init__(self, napari_viewer, parent=None):
+        """Initialise instance.
+
+        :param napari_viewer: Napari viewer instance, input should be handled by the napari_hook_implementation decoration
+        :type napari_viewer: napari.viewer.Viewer
+        :param parent: Parent widget, optional
+        :type parent: qtpy.QtWidgets.QWidget
+        """
         super(VoxelPlotter, self).__init__(parent)
         self.viewer = napari_viewer
         self.selected_layers = []
