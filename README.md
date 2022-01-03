@@ -5,7 +5,7 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/napari-time_series_plotter.svg?color=green)](https://python.org)
 [![tests](https://github.com/ch-n/napari-time_series_plotter/workflows/tests/badge.svg)](https://github.com/ch-n/napari-time_series_plotter/actions)
 [![codecov](https://codecov.io/gh/ch-n/napari-time_series_plotter/branch/main/graph/badge.svg)](https://codecov.io/gh/ch-n/napari-time_series_plotter)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-time_series_plotter)](https://napari-hub.org/plugins/napari-time-series-plotter)
+[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-time-series-plotter)](https://napari-hub.org/plugins/napari-time-series-plotter)
 
 A Plugin for napari to visualize pixel / voxel values over the first dimension (time -> t+3D, t+2D) as graphs.
 
