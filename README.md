@@ -1,11 +1,13 @@
 # napari-time_series_plotter
 
 [![License](https://img.shields.io/pypi/l/napari-time_series_plotter.svg?color=green)](https://github.com/ch-n/napari-time_series_plotter/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari-time_series_plotter.svg?color=green)](https://pypi.org/project/napari-time_series_plotter)
 [![Python Version](https://img.shields.io/pypi/pyversions/napari-time_series_plotter.svg?color=green)](https://python.org)
+[![PyPI](https://img.shields.io/pypi/v/napari-time_series_plotter.svg?color=green)](https://pypi.org/project/napari-time_series_plotter)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/napari-time-series-plotter/badges/version.svg)](https://anaconda.org/conda-forge/napari-time-series-plotter)
+[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-time-series-plotter)](https://napari-hub.org/plugins/napari-time-series-plotter)
 [![tests](https://github.com/ch-n/napari-time_series_plotter/workflows/tests/badge.svg)](https://github.com/ch-n/napari-time_series_plotter/actions)
 [![codecov](https://codecov.io/gh/ch-n/napari-time_series_plotter/branch/main/graph/badge.svg)](https://codecov.io/gh/ch-n/napari-time_series_plotter)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-time-series-plotter)](https://napari-hub.org/plugins/napari-time-series-plotter)
+
 
 ## Description
 Napari-time_series_plotter (TSP) is a plugin for the `napari` image viewer. TSP adds widgets to the viewer to select and visulise pixel / voxel values from one or multiple image layers as line plots. A plot represents the intensity of the selected pixel / voxel over the first dimension (time). TSP supports 3D and 4D images (4D: t+3D, 3D: t+2D).
@@ -13,15 +15,22 @@ Napari-time_series_plotter (TSP) is a plugin for the `napari` image viewer. TSP 
 ----------------------------------
 
 ## Installation
-You can either install the latest version via pip:
+You can either install the latest version via pip or conda.
+
+pip:
 
     pip install napari-time-series-plotter
 
-or directly in the `napari` viewers plugin manager.
+conda:
+
+    conda install -c conda-forge napari-time-series-plotter
+
+
+Alternatively you can install the plugin directly in the `napari` viewer plugin manager.
 
 <br>
 
-To install latest development version :
+To install the latest development version use:
 
     pip install git+https://github.com/ch-n/napari-time_series_plotter.git
 
