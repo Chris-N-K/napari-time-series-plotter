@@ -47,10 +47,10 @@ To install the latest development version use:
 ## ToDo
 - [ ] Add Sphinx documentation
 
-## Future goals
-- [ ] Add a toolbar for interaction with the figure
-- [ ] Add a widget to save the pixel / voxel series to file
-- [ ] Combine the standard widgets into one for more convenient usage
+## Version 0.1.0 Milstones
+- [ ] Update to napari-plugin-engine2 #5
+- [ ] Update widget GUI #6
+- [ ] Add widget to save pixel / voxel time series to file #7
 
 ## Contributing
 
