@@ -48,9 +48,9 @@ To install the latest development version use:
 - [ ] Add Sphinx documentation
 
 ## Version 0.1.0 Milstones
-- [ ] Update to napari-plugin-engine2 #5
-- [ ] Update widget GUI #6
-- [ ] Add widget to save pixel / voxel time series to file #7
+- [ ] Update to napari-plugin-engine2 [#5](https://github.com/ch-n/napari-time_series_plotter/issues/5)
+- [ ] Update widget GUI [#6](https://github.com/ch-n/napari-time_series_plotter/issues/6)
+- [ ] Add widget to save pixel / voxel time series to file [#7](https://github.com/ch-n/napari-time_series_plotter/issues/7)
 
 ## Contributing
 
