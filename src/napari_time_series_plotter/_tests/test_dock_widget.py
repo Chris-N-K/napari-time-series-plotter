@@ -1,9 +1,9 @@
 """
 Napari-time_series_plotter test module.
 """
-from napari_time_series_plotter._dock_widget import *
 import pytest
-import numpy as np
+
+from napari_time_series_plotter._dock_widget import *
 
 
 # fixture for LayerSelector class tests
@@ -172,10 +172,6 @@ def test_extract_voxel_time_series(plotter: VoxelPlotter, monkeypatch):
 
 
 # test functions
-def test_napari_experimental_provide_dock_widget():
-    assert all([a == b for a, b in zip([LayerSelector, VoxelPlotter], napari_experimental_provide_dock_widget())])
-
-
 def test_tspcheckbox():
     class MockLayer:
         name = 'test'

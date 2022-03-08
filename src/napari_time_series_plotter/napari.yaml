@@ -1,0 +1,15 @@
+name: napari-time-series-plotter
+schema_version: 0.1.0
+contributions:
+  commands:
+    - id: napari-time-series-plotter.LayerSelector
+      title: Create Layer Selector
+      python_name: napari_time_series_plotter._dock_widget:LayerSelector
+    - id: napari-time-series-plotter.VoxelPlotter
+      title: Create Voxel Plotter
+      python_name: napari_time_series_plotter._dock_widget:VoxelPlotter
+  widgets:
+    - command: napari-time-series-plotter.LayerSelector
+      display_name: Layer Selector
+    - command: napari-time-series-plotter.VoxelPlotter
+      display_name: Voxel Plotter
