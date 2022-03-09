@@ -6,9 +6,9 @@
 -e .
 
 # development requirements
-matplotlib==3.4.3
-napari==0.4.12
+matplotlib>=3.4.3
+napari>=0.4.12
 napari_plugin_engine==0.2.0
-numpy==1.21.4
-pytest==6.2.5
-qtpy==1.11.2
+numpy>=1.21.4
+pytest>=6.2.5
+qtpy>=1.11.2

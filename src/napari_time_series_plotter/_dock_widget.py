@@ -12,21 +12,19 @@ Non image layers or layers with more ore less dimensions will be ignored by the 
 The widgets are send to the viewer through the ``napari_experimental_provide_dock_widget`` hook specification.
 see: https://napari.org/docs/dev/plugins/hook_specifications.html
 """
+
 import matplotlib
 import napari.layers
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvas
-# from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-
-from napari.layers.image import Image
-from napari_plugin_engine import napari_hook_implementation
-
 import numpy as np
-
+from matplotlib.backends.backend_qt5agg import FigureCanvas
+from matplotlib.figure import Figure
+from napari.layers.image import Image
 from qtpy.QtCore import Signal, Slot, QObject
 from qtpy.QtWidgets import QDialog, QWidget, QVBoxLayout
 
 from ._widgets import TSPCheckBox
+
+# from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 matplotlib.use('QT5Agg')
 
@@ -202,8 +200,7 @@ class VoxelPlotter(QDialog):
         """
         self.selected_layers = selected_layers
 
-    @staticmethod
-    def _extract_voxel_time_series(cpos, nlayer):
+    def _extract_voxel_time_series(self, cpos, nlayer):
         """Method to extract the array element values along the first axis of a napari viewer layer.
 
         First the data array is extracted from a napari image layer and the cursor position is
@@ -257,9 +254,3 @@ class VoxelPlotter(QDialog):
             # redraw figure
             self.ax.legend(loc=1)
             self.fig.canvas.draw()
-
-
-@napari_hook_implementation
-def napari_experimental_provide_dock_widget():
-    # you can return either a single widget, or a sequence of widgets
-    return [LayerSelector, VoxelPlotter]
