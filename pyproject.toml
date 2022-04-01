@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools", "wheel", "setuptools_scm[toml]"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "src/napari_time_series_plotter/_version.py"
+
+[tool.black]
+line-length = 79
+
+[tool.isort]
+profile = "black"
+line_length = 79
