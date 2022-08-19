@@ -19,31 +19,33 @@ from ._widgets import LayerSelector, VoxelPlotter
 
 
 class TSPExplorer(QtWidgets.QWidget):
-    """napari-time-series-plotter main widget.
+    """napari_time_series_plotter main widget.
 
-    Contains the sub-widgets LayerSelector and VoxelPlotter.
+    Contains the sub-widgets LayerSelector and VoxelPlotter and is meant to be docked to the napari viewer.
+
+    Attributes:
+        viewer : napari.Viewer
+        tabs : QtWidgets.QTabWidget
+        selector : napari_time_series_plotter.LayerSelector
+        plotter : napari_time_series_plotter.VoxelPlotter
     """
     def __init__(self, napari_viewer, parent=None):
-        """Initialise instance.
-
-        :param napari_viewer: Napari viewer instance, input should be handled by the napari_hook_implementation decoration
-        :type napari_viewer: napari.viewer.Viewer
-        """
         super(TSPExplorer, self).__init__(parent)
         self.viewer = napari_viewer
-        self.init_ui()
 
-        self.selector.model.itemChanged.connect(self.plotter.update_layers)
-        self.viewer.layers.events.inserted.connect(self.selector.update_model)
-        self.viewer.layers.events.removed.connect(self.selector.update_model)
-
-    def init_ui(self):
+        # subwidgets
         self.tabs = QtWidgets.QTabWidget()
         self.selector = LayerSelector(self.viewer)
         self.plotter = VoxelPlotter(self.viewer, self.selector)
         self.tabs.addTab(self.selector, 'LayerSelector')
         self.tabs.addTab(self.plotter, 'TimeSeriesPlotter')
 
+        # layout
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.tabs)
         self.setLayout(layout)
+
+        # callbacks
+        self.selector.model.itemChanged.connect(self.plotter.update_layers)
+        self.viewer.layers.events.inserted.connect(self.selector.update_model)
+        self.viewer.layers.events.removed.connect(self.selector.update_model)
