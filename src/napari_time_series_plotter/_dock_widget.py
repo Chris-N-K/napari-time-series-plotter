@@ -17,8 +17,6 @@ from qtpy import QtWidgets
 
 from ._widgets import LayerSelector, VoxelPlotter
 
-import warnings
-warnings.filterwarnings('ignore')
 
 class TSPExplorer(QtWidgets.QWidget):
     """napari-time-series-plotter main widget.
@@ -35,22 +33,17 @@ class TSPExplorer(QtWidgets.QWidget):
         self.viewer = napari_viewer
         self.init_ui()
 
-        self.selector.model.itemChanged.connect(self.on_selector_change)
+        self.selector.model.itemChanged.connect(self.plotter.update_layers)
         self.viewer.layers.events.inserted.connect(self.selector.update_model)
         self.viewer.layers.events.removed.connect(self.selector.update_model)
 
     def init_ui(self):
         self.tabs = QtWidgets.QTabWidget()
         self.selector = LayerSelector(self.viewer)
-        self.plotter = VoxelPlotter(self.viewer)
+        self.plotter = VoxelPlotter(self.viewer, self.selector)
         self.tabs.addTab(self.selector, 'LayerSelector')
         self.tabs.addTab(self.plotter, 'TimeSeriesPlotter')
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.tabs)
         self.setLayout(layout)
-
-    def on_selector_change(self):
-        checked = self.selector.model.get_checked()
-        print(checked)
-        self.plotter.selected_layers = checked
