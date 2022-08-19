@@ -2,10 +2,11 @@ import napari.layers
 import numpy as np
 
 from napari_matplotlib.base import NapariMPLWidget
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtGui, QtWidgets
 
-from ._utils import get_valid_image_layers, extract_voxel_time_series, SelectorListItem, SelectorListModel
+from .utils import *
 
+__all__ = ('LayerSelector', 'VoxelPlotter')
 
 class LayerSelector(QtWidgets.QListView):
     """Subclass of QListView for selection of 3D/4D napari image layers.

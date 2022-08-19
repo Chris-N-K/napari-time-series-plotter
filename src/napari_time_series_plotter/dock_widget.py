@@ -15,7 +15,9 @@ see: https://napari.org/docs/dev/plugins/hook_specifications.html
 
 from qtpy import QtWidgets
 
-from ._widgets import LayerSelector, VoxelPlotter
+from .widgets import *
+
+__all__ = ('TSPExplorer',)
 
 
 class TSPExplorer(QtWidgets.QWidget):
