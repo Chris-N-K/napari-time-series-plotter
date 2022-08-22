@@ -38,16 +38,20 @@ class TSPExplorer(QtWidgets.QWidget):
         # subwidgets
         self.tabs = QtWidgets.QTabWidget()
         self.selector = LayerSelector(self.viewer)
-        self.plotter = VoxelPlotter(self.viewer, self.selector)
-        self.tabs.addTab(self.selector, 'LayerSelector')
-        self.tabs.addTab(self.plotter, 'TimeSeriesPlotter')
+        self.options = TSPOptions()
+        self.plotter = VoxelPlotter(self.viewer, self.selector, self.options.plotter_options())
+        self.tabs.addTab(self.plotter, 'Plotter')
+        self.tabs.addTab(self.options, 'Options')
 
         # layout
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.tabs)
+        layout.addWidget(QtWidgets.QLabel('Layer Selector'))
+        layout.addWidget(self.selector)
         self.setLayout(layout)
 
         # callbacks
         self.selector.model().itemChanged.connect(self.plotter.update_layers)
         self.viewer.layers.events.inserted.connect(self.selector.update_model)
         self.viewer.layers.events.removed.connect(self.selector.update_model)
+        self.options.plotter_option_changed.connect(self.plotter.update_options)

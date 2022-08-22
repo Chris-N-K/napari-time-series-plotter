@@ -2,11 +2,12 @@ import napari.layers
 import numpy as np
 
 from napari_matplotlib.base import NapariMPLWidget
-from qtpy import QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 from .utils import *
 
-__all__ = ('LayerSelector', 'VoxelPlotter')
+__all__ = ('LayerSelector', 'VoxelPlotter', 'TSPOptions')
+
 
 class LayerSelector(QtWidgets.QListView):
     """Subclass of QListView for selection of 3D/4D napari image layers.
@@ -29,6 +30,8 @@ class LayerSelector(QtWidgets.QListView):
         """
         Update the underlying model data (clear and rewrite) and emit an itemChanged event.
         The size of the widget is adjusted to the number of items displayed.
+
+        :param event: Not used, just for napari event compatibility.
         """
         self.model().clear()
         for layer in get_valid_image_layers(self.napari_viewer.layers):
@@ -53,12 +56,19 @@ class VoxelPlotter(NapariMPLWidget):
         selector : napari_time_series_plotter.LayerSelector
         cursor_pos : tuple of current mouse cursor position in the napari viewer
     """
-    def __init__(self, napari_viewer, selector):
+    def __init__(self, napari_viewer, selector, options=None):
         super().__init__(napari_viewer)
         self.selector = selector
         self.axes = self.canvas.figure.subplots()
+        self.cursor_pos = np.array([])
         self.update_layers(None)
-        self.cursor_pos = ()
+        if options:
+            self.update_options(options)
+        else:
+            self.autoscale = True
+            self.x_lim = (None, None)
+            self.y_lim = (None, None)
+            self.max_label_len = None
 
     def clear(self):
         """
@@ -71,9 +81,41 @@ class VoxelPlotter(NapariMPLWidget):
         Draw a value over time line plot for the voxels of all layers in the layer attribute at the position stored
         in the cursor_pos attribute. The first dimension is handled as time.
         """
-        if not self.layers or len(self.cursor_pos) == 0:
+        handles = []
+        if self.layers and self.cursor_pos.size != 0:
+            # add new graphs
+            for layer in self.layers:
+                # get layer data
+                if self.max_label_len:
+                    lname = layer.name[slice(self.max_label_len)]
+                else:
+                    lname = layer.name
+                # extract voxel time series
+                vts = extract_voxel_time_series(self.cursor_pos, layer)
+                if not isinstance(vts, type(None)):
+                    # add graph
+                    handles.extend(self.axes.plot(vts, label=lname))
+        if handles:
+            self.axes.set_title(f'Position: {self.cursor_pos}')
+            self.axes.tick_params(
+                axis='both',  # changes apply to the x-axis
+                which='both',  # both major and minor ticks are affected
+                bottom=True,  # ticks along the bottom edge are off
+                top=False,  # ticks along the top edge are off
+                labelbottom=True,
+                left=True,
+                right=False,
+                labelleft=True,
+            )
+            self.axes.set_xlabel('Time')
+            self.axes.set_ylabel('Pixel / Voxel Values')
+            if not self.autoscale:
+                self.axes.set_xlim(self.x_lim)
+                self.axes.set_ylim(self.y_lim)
+            self.axes.legend(loc=1)
+        else:
             self.axes.annotate(
-                'Select layer(s) and hold "Shift" while moving\nthe cursor to plot pixel / voxel time series',
+                'Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series',
                 (0.5, 0.5),
                 ha='center',
                 va='center',
@@ -89,21 +131,6 @@ class VoxelPlotter(NapariMPLWidget):
                 right=False,
                 labelleft=False,
             )
-            return
-        # get cursor position from viewer
-        # add new graphs
-        for layer in self.layers:
-            # get layer data
-            lname = layer.name
-            # extract voxel time series
-            ind, vts = extract_voxel_time_series(self.cursor_pos, layer)
-            if not isinstance(vts, type(None)):
-                # add graph
-                self.axes.plot(vts, label=lname)
-            self.axes.set_title(f'Series [:, {str(ind[1:]).replace("(", "").replace(")", "")}]')
-        self.axes.set_xlabel('Time')
-        self.axes.set_ylabel('Pixel / Voxel Values')
-        self.axes.legend(loc=1)
 
     def update_layers(self, event: napari.utils.events.Event) -> None:
         """
@@ -131,3 +158,72 @@ class VoxelPlotter(NapariMPLWidget):
             self.cursor_pos = np.round(viewer.cursor.position)
             self._draw()
 
+    def update_options(self, options_dict):
+        self.autoscale = options_dict['autoscale']
+        self.x_lim = options_dict['x_lim']
+        self.y_lim = options_dict['y_lim']
+        if options_dict['truncate']:
+            self.max_label_len = options_dict['trunc_len']
+        else:
+            self.max_label_len = None
+        self._draw()
+
+
+class TSPOptions(QtWidgets.QWidget):
+    # signals
+    plotter_option_changed = QtCore.Signal(dict)
+
+    def __init__(self):
+        super().__init__()
+        # subwidgets
+        self.label_plotter_options = QtWidgets.QLabel('Plotter Options')
+        self.label_plotter_options.setStyleSheet(" font-weight: bold; text-decoration: underline; ")
+        self.cb_autoscale = QtWidgets.QCheckBox()
+        self.cb_autoscale.setChecked(True)
+        self.le_autoscale_x_min = QtWidgets.QLineEdit()
+        self.le_autoscale_x_max = QtWidgets.QLineEdit()
+        self.le_autoscale_y_min = QtWidgets.QLineEdit()
+        self.le_autoscale_y_max = QtWidgets.QLineEdit()
+        self.cb_trunc = QtWidgets.QCheckBox()
+        self.cb_trunc.setChecked(False)
+        self.le_trunc = QtWidgets.QLineEdit()
+
+        # connect callbacks
+        # plotter options
+        self.cb_autoscale.stateChanged.connect(self.poc_callback)
+        self.le_autoscale_x_min.editingFinished.connect(self.poc_callback)
+        self.le_autoscale_x_max.editingFinished.connect(self.poc_callback)
+        self.le_autoscale_y_min.editingFinished.connect(self.poc_callback)
+        self.le_autoscale_y_max.editingFinished.connect(self.poc_callback)
+        self.cb_trunc.stateChanged.connect(self.poc_callback)
+        self.le_trunc.editingFinished.connect(self.poc_callback)
+
+        # layout
+        layout = QtWidgets.QFormLayout()
+        layout.addRow(self.label_plotter_options)
+        layout.addRow('Auto scale plot axes', self.cb_autoscale)
+        layout.addRow('x_min', self.le_autoscale_x_min)
+        layout.addRow('x_max', self.le_autoscale_x_max)
+        layout.addRow('y_min', self.le_autoscale_y_min)
+        layout.addRow('y_max', self.le_autoscale_y_max)
+        layout.addRow('Truncate layer names', self.cb_trunc)
+        layout.addRow('max length', self.le_trunc)
+        self.setLayout(layout)
+
+    def poc_callback(self):
+        self.plotter_option_changed.emit(self.plotter_options())
+
+    def plotter_options(self):
+        return dict(
+            autoscale=self.cb_autoscale.isChecked(),
+            x_lim=(
+                int(self.le_autoscale_x_min.text()) if self.le_autoscale_x_min.text() else None,
+                int(self.le_autoscale_x_max.text()) if self.le_autoscale_x_max.text() else None,
+            ),
+            y_lim=(
+                int(self.le_autoscale_y_min.text()) if self.le_autoscale_y_min.text() else None,
+                int(self.le_autoscale_y_max.text()) if self.le_autoscale_y_max.text() else None,
+            ),
+            truncate=self.cb_trunc.isChecked(),
+            trunc_len=int(self.le_trunc.text()) if self.le_trunc.text() else None,
+        )

@@ -23,6 +23,7 @@ def test_get_valid_image_layers(layer_list):
          for layer in get_valid_image_layers(layer_list)]
     )
 
+
 def test_extract_voxel_time_series(layer_list):
     layer = layer_list[1]
 
@@ -31,13 +32,11 @@ def test_extract_voxel_time_series(layer_list):
     cursor_pos_2 = np.array([3.1, -3.4, 5.0, 2.7])
 
     # extracted data should be equal mock data
-    ind, vts = extract_voxel_time_series(cursor_pos_1, layer)
-    assert ind == (3, 7, 3, 1)
+    vts = extract_voxel_time_series(cursor_pos_1, layer)
     assert np.all(vts == layer.data[:, 7, 3, 1])
 
     # cursor position outside of the array index should yield no data
-    ind, vts = extract_voxel_time_series(cursor_pos_2, layer)
-    assert ind == (3, -3, 5, 3)
+    vts = extract_voxel_time_series(cursor_pos_2, layer)
     assert not vts
 
 
@@ -45,7 +44,7 @@ def test_SelectorListItem(layer_list):
     layer = layer_list[1]
     item = SelectorListItem(layer)
 
-    #test init
+    # test init
     assert item.text() == layer.name
     assert item.isCheckable()
     assert not item.checkState()

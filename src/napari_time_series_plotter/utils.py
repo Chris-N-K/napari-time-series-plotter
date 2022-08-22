@@ -33,8 +33,7 @@ def extract_voxel_time_series(cpos, layer):
     ind = tuple(map(int, np.round(layer.world_to_data(cpos))))
     # return extracted data if index matches array
     if all([0 <= i < max_i for i, max_i in zip(ind, data.shape)]):
-        return ind, data[(slice(None),) + ind[1:]]
-    return ind, None
+        return data[(slice(None),) + ind[1:]]
 
 
 # classes
@@ -89,5 +88,3 @@ class SelectorListModel(QtGui.QStandardItemModel):
             if item.checkState() == QtCore.Qt.Checked:
                 checked.append(item.layer)
         return checked
-
-
