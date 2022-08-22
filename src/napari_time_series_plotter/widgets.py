@@ -19,11 +19,10 @@ class LayerSelector(QtWidgets.QListView):
         napari_viewer : napari.Viewer
         parent : Qt parent widget / window, default None
     """
-    def __init__(self, napari_viewer, parent=None):
+    def __init__(self, napari_viewer, model=SelectorListModel(), parent=None):
         super(LayerSelector, self).__init__(parent)
         self.napari_viewer = napari_viewer
-        self.model = SelectorListModel()
-        self.setModel(self.model)
+        self.setModel(model)
         self.update_model(None)
 
     def update_model(self, event):
@@ -31,13 +30,13 @@ class LayerSelector(QtWidgets.QListView):
         Update the underlying model data (clear and rewrite) and emit an itemChanged event.
         The size of the widget is adjusted to the number of items displayed.
         """
-        self.model.clear()
+        self.model().clear()
         for layer in get_valid_image_layers(self.napari_viewer.layers):
             item = SelectorListItem(layer)
-            self.model.appendRow(item)
+            self.model().appendRow(item)
         self.setMaximumHeight(
-            self.sizeHintForRow(0) * self.model.rowCount() + 2 * self.frameWidth())
-        self.model.itemChanged.emit(QtGui.QStandardItem())
+            self.sizeHintForRow(0) * self.model().rowCount() + 2 * self.frameWidth())
+        self.model().itemChanged.emit(QtGui.QStandardItem())
 
 
 class VoxelPlotter(NapariMPLWidget):
@@ -110,7 +109,7 @@ class VoxelPlotter(NapariMPLWidget):
         """
         Overwrite the layers attribute with the currently checked items in the selector model and re-draw.
         """
-        self.layers = self.selector.model.get_checked()
+        self.layers = self.selector.model().get_checked()
         self._draw()
 
     def setup_callbacks(self) -> None:

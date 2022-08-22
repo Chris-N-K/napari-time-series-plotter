@@ -52,16 +52,16 @@ class SelectorListItem(QtGui.QStandardItem):
         self.layer = napari_layer
         self.setText(self.layer.name)
         self.setCheckable(True)
-        self.setCheckState(Qt.CheckState.Unchecked)
-        self.layer.events.name.connect(self.layer_name_changed)
+        self.setCheckState(Qt.Unchecked)
+        self.layer.events.name.connect(self._layer_name_changed)
 
-    def type(self) -> int:
+    def type(self):
         """
         Return custom type code.
         """
         return 1001
 
-    def layer_name_changed(self, event):
+    def _layer_name_changed(self, event):
         """
         Receiver for napari layer.events.name event. Updates the item text according to the new layer name.
         """

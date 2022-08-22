@@ -48,6 +48,6 @@ class TSPExplorer(QtWidgets.QWidget):
         self.setLayout(layout)
 
         # callbacks
-        self.selector.model.itemChanged.connect(self.plotter.update_layers)
+        self.selector.model().itemChanged.connect(self.plotter.update_layers)
         self.viewer.layers.events.inserted.connect(self.selector.update_model)
         self.viewer.layers.events.removed.connect(self.selector.update_model)
