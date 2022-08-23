@@ -38,7 +38,7 @@ To install the latest development version install direktly from the relevant git
 
 ## Usage
 <p align="center">
-  <img src="https://github.com/ch-n/napari-time_series_plotter/raw/main/napari-time_series_plotter_demo.gif" alt="Demo gif" />
+  <img src="https://github.com/ch-n/napari-time_series_plotter/raw/main/napari-time-series-plotter_demo.gif" alt="Demo gif" />
 </p>
     
 - Select the TSPExplorer widget in the `Plugins` tab of the napari viewer
