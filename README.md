@@ -10,7 +10,7 @@
 
 
 ## Description
-Napari-time_series_plotter (TSP) is a plugin for the `napari` image viewer. TSP adds widgets to the viewer to select and visulise pixel / voxel values from one or multiple image layers as line plots. A plot represents the intensity of the selected pixel / voxel over the first dimension (time). TSP supports 3D and 4D images (4D: t+3D, 3D: t+2D).
+Napari-time_series_plotter (TSP) is a plugin for the `napari` image viewer. TSP adds widgets to the viewer to select and visulise pixel / voxel values from one or multiple image layers as line plots. A plot represents the intensity of the selected pixel / voxel over the first dimension (time). TSP supports 3D to nD images (3D: t+2D, nD: t+nD).
 
 ----------------------------------
 
