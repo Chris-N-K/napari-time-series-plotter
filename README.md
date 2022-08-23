@@ -10,39 +10,42 @@
 
 
 ## Description
-Napari-time_series_plotter (TSP) is a plugin for the `napari` image viewer. TSP adds widgets to the viewer to select and visulise pixel / voxel values from one or multiple image layers as line plots. A plot represents the intensity of the selected pixel / voxel over the first dimension (time). TSP supports 3D and 4D images (4D: t+3D, 3D: t+2D).
+Napari-time_series_plotter (TSP) is a plugin for the `napari` image viewer. TSP adds widgets to the viewer to select and visulise pixel / voxel values from one or multiple image layers as line plots. A plot represents the intensity of the selected pixel / voxel over the first dimension (time). TSP supports 3D to nD images (3D: t+2D, nD: t+nD).
 
 ----------------------------------
 
 ## Installation
 You can either install the latest version via pip or conda.
 
-pip:
+**pip:**
 
     pip install napari-time-series-plotter
 
-conda:
+or download the packaged `tar.gz` file from the release assets and install with 
+    
+    pip install /path/to/file.tar.gz
+
+**conda:**
 
     conda install -c conda-forge napari-time-series-plotter
 
 
-Alternatively you can install the plugin directly in the `napari` viewer plugin manager.
+Alternatively you can install the plugin directly in the `napari` viewer plugin manager, he napari hub or the release assets.
 
 <br>
 
-To install the latest development version use:
-
-    pip install git+https://github.com/ch-n/napari-time_series_plotter.git
+To install the latest development version install direktly from the relevant github branche.
 
 ## Usage
 <p align="center">
-  <img src="https://github.com/ch-n/napari-time_series_plotter/raw/main/napari-time_series_plotter_demo.gif" alt="Demo gif" />
+  <img src="https://github.com/ch-n/napari-time_series_plotter/raw/main/napari-time-series-plotter_demo.gif" alt="Demo gif" />
 </p>
     
-- Select the two TSP widgets LayerSelectror and VoxelPlotter in the `Plugins` tab in the viewer
+- Select the TSPExplorer widget in the `Plugins` tab of the napari viewer
 - Use the LayerSelector to chose the image layers you want to select for plotting
 - Move the mouse over the image while holding `Shift`
 - The plotter will display graphs for all selected layers and a legend
+- Changes plotter options in the Options tab
 
 ## ToDo
 - [ ] Add Sphinx documentation
