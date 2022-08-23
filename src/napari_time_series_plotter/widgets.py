@@ -5,7 +5,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 from .utils import *
 
-__all__ = ('LayerSelector', 'VoxelPlotter', 'TSPOptions')
+__all__ = ('LayerSelector', 'VoxelPlotter', 'OptionsManager')
 
 
 class LayerSelector(QtWidgets.QListView):
@@ -168,7 +168,7 @@ class VoxelPlotter(NapariMPLWidget):
         self._draw()
 
 
-class TSPOptions(QtWidgets.QWidget):
+class OptionsManager(QtWidgets.QWidget):
     # signals
     plotter_option_changed = QtCore.Signal(dict)
 

@@ -5,7 +5,7 @@ from pytestqt import qtbot
 from qtpy import QtWidgets
 
 from ..dock_widget import TSPExplorer
-from ..widgets import LayerSelector, VoxelPlotter, TSPOptions
+from ..widgets import LayerSelector, VoxelPlotter, OptionsManager
 
 
 def test_TSPExplorer(make_napari_viewer, qtbot: qtbot):
@@ -17,7 +17,7 @@ def test_TSPExplorer(make_napari_viewer, qtbot: qtbot):
     assert plotter
 
     # test options
-    options = explorer.findChild(TSPOptions)
+    options = explorer.findChild(OptionsManager)
     assert options
 
     # test tabs

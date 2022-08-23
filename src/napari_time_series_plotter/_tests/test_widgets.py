@@ -5,7 +5,7 @@ from qtpy.QtCore import Signal, QObject
 
 from matplotlib.axes import Axes
 
-from ..widgets import LayerSelector, VoxelPlotter, TSPOptions
+from ..widgets import LayerSelector, VoxelPlotter, OptionsManager
 from ..utils import SelectorListModel
 
 
@@ -143,7 +143,7 @@ def test_VP_update_options(plotter: VoxelPlotter):
 
 
 def test_TSPOptions(qtbot: qtbot):
-    tspoptions = TSPOptions()
+    tspoptions = OptionsManager()
 
     def check_return(status: dict):
         return all([

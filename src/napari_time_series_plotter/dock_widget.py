@@ -38,7 +38,7 @@ class TSPExplorer(QtWidgets.QWidget):
         # subwidgets
         self.tabs = QtWidgets.QTabWidget()
         self.selector = LayerSelector(self.viewer)
-        self.options = TSPOptions()
+        self.options = OptionsManager()
         self.plotter = VoxelPlotter(self.viewer, self.selector, self.options.plotter_options())
         self.tabs.addTab(self.plotter, 'Plotter')
         self.tabs.addTab(self.options, 'Options')
