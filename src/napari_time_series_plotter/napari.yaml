@@ -7,4 +7,4 @@ contributions:
       python_name: napari_time_series_plotter.dock_widget:TSPExplorer
   widgets:
     - command: napari-time-series-plotter.TSPExplorer
-      display_name: TimeSeriesPlotter
+      display_name: TSPExplorer
