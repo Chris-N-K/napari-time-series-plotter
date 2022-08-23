@@ -1,4 +1,3 @@
-import napari.layers
 import numpy as np
 
 from napari_matplotlib.base import NapariMPLWidget
@@ -132,14 +131,14 @@ class VoxelPlotter(NapariMPLWidget):
                 labelleft=False,
             )
 
-    def update_layers(self, event: napari.utils.events.Event) -> None:
+    def update_layers(self, event):
         """
         Overwrite the layers attribute with the currently checked items in the selector model and re-draw.
         """
         self.layers = self.selector.model().get_checked()
         self._draw()
 
-    def setup_callbacks(self) -> None:
+    def setup_callbacks(self):
         """
         Setup callbacks for:
          - mouse move inside of the napari viewer
