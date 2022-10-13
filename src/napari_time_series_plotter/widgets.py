@@ -76,61 +76,87 @@ class VoxelPlotter(NapariMPLWidget):
         self.axes.clear()
 
     def draw(self):
-        """
-        Draw a value over time line plot for the voxels of all layers in the layer attribute at the position stored
-        in the cursor_pos attribute. The first dimension is handled as time.
-        """
-        handles = []
-        if self.layers and self.cursor_pos.size != 0:
-            # add new graphs
-            for layer in self.layers:
-                # get layer data
-                if self.max_label_len:
-                    lname = layer.name[slice(self.max_label_len)]
-                else:
-                    lname = layer.name
-                # extract voxel time series
-                vts = extract_voxel_time_series(self.cursor_pos, layer)
-                if not isinstance(vts, type(None)):
-                    # add graph
-                    handles.extend(self.axes.plot(vts, label=lname))
-        if handles:
-            self.axes.set_title(f'Position: {self.cursor_pos}')
-            self.axes.tick_params(
-                axis='both',  # changes apply to the x-axis
-                which='both',  # both major and minor ticks are affected
-                bottom=True,  # ticks along the bottom edge are off
-                top=False,  # ticks along the top edge are off
-                labelbottom=True,
-                left=True,
-                right=False,
-                labelleft=True,
-            )
-            self.axes.set_xlabel('Time')
-            self.axes.set_ylabel('Pixel / Voxel Values')
-            if not self.autoscale:
-                self.axes.set_xlim(self.x_lim)
-                self.axes.set_ylim(self.y_lim)
-            self.axes.legend(loc=1)
-        else:
-            self.axes.annotate(
-                'Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series',
-                (0.5, 0.5),
-                ha='center',
-                va='center',
-                size=15,
-            )
-            self.axes.tick_params(
-                axis='both',  # changes apply to the x-axis
-                which='both',  # both major and minor ticks are affected
-                bottom=False,  # ticks along the bottom edge are off
-                top=False,  # ticks along the top edge are off
-                labelbottom=False,
-                left=False,
-                right=False,
-                labelleft=False,
-            )
+      """
+      Draw a value over time line plot for the voxels of all layers in the layer attribute at the position stored
+      in the cursor_pos attribute. The first dimension is handled as time.
+      """
+      handles = []
 
+      if self.layers: # --> changed logic for slimmer code
+          for layer in self.layers:
+              # get layer data
+              if self.max_label_len:
+                  lname = layer.name[slice(self.max_label_len)]
+              else:
+                  lname = layer.name
+
+              # plot voxel / pixel time series
+              if self.mode == 'Voxel' and self.cursor_pos.size != 0:
+                  # extract voxel time series
+                  vts = extract_voxel_time_series(
+                      self.cursor_pos,
+                      layer
+                  )
+                  # add graph
+                  if not isinstance(vts, type(None)):
+                      handles.extend(self.axes.plot(vts, label=lname))
+
+              # plot mean value from square ROI(s) in shape layers 
+              # --> switched to only one shapes layer so no more shape layer iteration
+              elif self.mode == 'Shapes' and self.selection_layer and len(self.selection_layer.data) > 0:
+                  # convert shape to 2d labels to be used later for the mask
+                  labels = self.selection_layer.to_labels(layer.data.shape[-2:]) # --> now we always take 2d labels
+                  # iterate over ROIs in shapes layer
+                  for idx_shape in range(self.selection_layer.nshapes):
+                      # calculate finally the mean value
+                      roi_ts = extract_mean_ROI_shape_time_series(
+                          self.viewer.dims.current_step,  # get current step from viewer --> we need this for 4d support
+                          layer,
+                          labels,
+                          idx_shape
+                      )
+                      # dropped  the shape type we could use it but I ear it will clutter the legend
+                      if not isinstance(roi_ts, type(None)):
+                          # add graph
+                          handles.extend(self.axes.plot(roi_ts, label=f'{lname}_ROI-{idx_shape}'))
+
+      if handles:
+          self.axes.set_title(f'Position: {self.cursor_pos}')
+          self.axes.tick_params(
+              axis='both',  # changes apply to the x-axis
+              which='both',  # both major and minor ticks are affected
+              bottom=True,  # ticks along the bottom edge are off
+              top=False,  # ticks along the top edge are off
+              labelbottom=True,
+              left=True,
+              right=False,
+              labelleft=True,
+          )
+          self.axes.set_xlabel('Time')
+          self.axes.set_ylabel('Pixel / Voxel Values')
+          if not self.autoscale:
+              self.axes.set_xlim(self.x_lim)
+              self.axes.set_ylim(self.y_lim)
+          self.axes.legend(loc=1)
+      else:
+          self.axes.annotate(
+              'Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series',
+              (0.5, 0.5),
+              ha='center',
+              va='center',
+              size=15,
+          )
+          self.axes.tick_params(
+              axis='both',  # changes apply to the x-axis
+              which='both',  # both major and minor ticks are affected
+              bottom=False,  # ticks along the bottom edge are off
+              top=False,  # ticks along the top edge are off
+              labelbottom=False,
+              left=False,
+              right=False,
+              labelleft=False,
+          )
+          
     def update_layers(self, event):
         """
         Overwrite the layers attribute with the currently checked items in the selector model and re-draw.
@@ -158,14 +184,25 @@ class VoxelPlotter(NapariMPLWidget):
             self._draw()
 
     def update_options(self, options_dict):
-        self.autoscale = options_dict['autoscale']
-        self.x_lim = options_dict['x_lim']
-        self.y_lim = options_dict['y_lim']
-        if options_dict['truncate']:
-            self.max_label_len = options_dict['trunc_len']
-        else:
-            self.max_label_len = None
-        self._draw()
+      self.autoscale = options_dict['autoscale']
+      self.x_lim = options_dict['x_lim']
+      self.y_lim = options_dict['y_lim']
+      if options_dict['truncate']:
+          self.max_label_len = options_dict['trunc_len']
+      else:
+          self.max_label_len = None
+      self.set_mode(options_dict['mode'])
+      self._draw()
+
+    def set_mode(self, mode):
+        self.mode = mode
+        if mode == 'Shapes':
+            self.viewer.add_shapes(data=None, face_color='whitesmoke', opacity = 0.3, name='ROI selection')
+            self.selection_layer = self.viewer.layers['ROI selection']
+        elif mode == 'Voxel':
+            if 'ROI selection' in self.viewer.layers:
+                self.viewer.layers.remove('ROI selection')
+            self.selection_layer = None
 
 
 class OptionsManager(QtWidgets.QWidget):
@@ -186,6 +223,12 @@ class OptionsManager(QtWidgets.QWidget):
         self.cb_trunc = QtWidgets.QCheckBox()
         self.cb_trunc.setChecked(False)
         self.le_trunc = QtWidgets.QLineEdit()
+        # Add toggle widget to layout --> switched to a combobox, allows for further modes like points mode ^^
+        # Changed the name as well to better represent the actual functionality
+        self.mode = QtWidgets.QComboBox()
+        self.mode.addItems(['Voxel', 'Shapes'])
+        # self.mode.setCurrentText('Voxel')
+        # further down changed all toggle to mode
 
         # connect callbacks
         # plotter options
@@ -196,6 +239,8 @@ class OptionsManager(QtWidgets.QWidget):
         self.le_autoscale_y_max.editingFinished.connect(self.poc_callback)
         self.cb_trunc.stateChanged.connect(self.poc_callback)
         self.le_trunc.editingFinished.connect(self.poc_callback)
+        # self.mode.stateChanged.connect(self.poc_callback)
+        self.mode.currentIndexChanged.connect(self.poc_callback)
 
         # layout
         layout = QtWidgets.QFormLayout()
@@ -207,6 +252,7 @@ class OptionsManager(QtWidgets.QWidget):
         layout.addRow('y_max', self.le_autoscale_y_max)
         layout.addRow('Truncate layer names', self.cb_trunc)
         layout.addRow('max length', self.le_trunc)
+        layout.addRow('Plot mode', self.mode)
         self.setLayout(layout)
 
     def poc_callback(self):
@@ -225,4 +271,5 @@ class OptionsManager(QtWidgets.QWidget):
             ),
             truncate=self.cb_trunc.isChecked(),
             trunc_len=int(self.le_trunc.text()) if self.le_trunc.text() else None,
+            mode=self.mode.currentText()
         )
