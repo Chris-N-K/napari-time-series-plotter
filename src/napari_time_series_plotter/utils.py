@@ -3,7 +3,15 @@ import numpy as np
 from qtpy import QtCore, QtGui
 from qtpy.QtCore import Qt
 
-__all__ = ('get_valid_image_layers', 'extract_voxel_time_series', 'extract_mean_ROI_shape_time_series', 'SelectorListItem', 'SelectorListModel')
+from napari.layers import Shapes, Image
+
+__all__ = (
+    'get_valid_image_layers',
+    'extract_voxel_time_series',
+    'extract_mean_ROI_shape_time_series',
+    'SelectorListItem',
+    'SelectorListModel'
+)
 
 
 # functions
@@ -12,7 +20,6 @@ def get_valid_image_layers(layer_list):
     Extract napari images layers of 3 or more dimensions from the input list.
     """
     out = [layer for layer in layer_list if layer._type_string == 'image' and layer.data.ndim >= 3]
-    out.reverse()
     return out
 
 
@@ -35,21 +42,22 @@ def extract_voxel_time_series(cpos, layer):
     if all([0 <= i < max_i for i, max_i in zip(ind, data.shape)]):
         return data[(slice(None),) + ind[1:]]
 
+
 def extract_mean_ROI_shape_time_series(current_step, layer, labels, idx_shape):
     """Extract the array element values inside a ROI along the first axis of a napari viewer layer.
-    
+
     :param current_step: napari viewer current step
-    :param layer: a simgle image layer
+    :param layer: a napari image layer
     :param labels: the label for the given shape
     :param idx_shape: the index value for a given shape
     """
-    
+
     ndim = layer.ndim
     dshape = layer.data.shape
-    
-    # convert ROI label to mask --> added support for 4D layers, as well as slight rework of the input params
+
+    # convert ROI label to mask
     if ndim == 3:
-        mask = np.tile(labels == (idx_shape + 1), (dshape[0], 1, 1)) # this I have to put it back for 3D images because was giving me an error
+        mask = np.tile(labels == (idx_shape + 1), dshape)
     else:  # 4d
         # respect the current step --> 2D ROI on 3D volume
         raw_mask = np.zeros((1, *dshape[1:]), dtype=bool)
@@ -58,6 +66,8 @@ def extract_mean_ROI_shape_time_series(current_step, layer, labels, idx_shape):
 
     # extract mean and append to the list of ROIS    
     return layer.data[mask].reshape(dshape[0], -1).mean(axis=1)
+
+# TODO: It might be possible to use the same functionality in all three extractions as world to data will make a 2d point / label to nd matching the image
 
 # classes
 class SelectorListItem(QtGui.QStandardItem):
@@ -111,3 +121,22 @@ class SelectorListModel(QtGui.QStandardItemModel):
             if item.checkState() == QtCore.Qt.Checked:
                 checked.append(item.layer)
         return checked
+
+    def get_item_idx_by_text(self, search_text):
+        """Returns all items which text attribute matches search_text.
+
+        :param search_text: Text to match to item.text()
+        :type search_text: str
+
+        :return: All items with item.text matching text
+        :return type: list
+
+        """
+        matches = []
+        for index in range(self.rowCount()):
+            item = self.item(index)
+            if item.text() == search_text:
+                matches.append(index)
+        if len(matches) == 1:
+            return matches[0]
+        return matches
