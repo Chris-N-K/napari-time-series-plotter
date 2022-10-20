@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from napari.layers import Image
 from pytestqt import qtbot
 from qtpy.QtCore import Signal, QObject
 
@@ -38,19 +39,27 @@ def test_LayerSelector(napari_viewer, selector: LayerSelector, qtbot: qtbot):
     assert not selector.parent()
     assert selector.model().rowCount() == 2
 
-    # TODO: mouse click test
-
     # test update_model
-    napari_viewer.add_image(np.random.randint(0, 100, (10, 10, 10, 10)), name='new')
+    # layer None
     with qtbot.waitSignal(selector.model().itemChanged, timeout=100):
-        selector.update_model(None)
+        selector.update_model(None, None)
+    assert selector.model().rowCount() == 2
+    # layer insertion
+    new_layer = Image(np.random.randint(0, 100, (10, 10, 10, 10)), name='new')
+    with qtbot.waitSignal(selector.model().itemChanged, timeout=100):
+        selector.update_model(new_layer, 'inserted')
     assert selector.model().rowCount() == 3
+    # layer removal
+    with qtbot.waitSignal(selector.model().itemChanged, timeout=100):
+        selector.update_model(new_layer, 'removed')
+    assert selector.model().rowCount() == 2
 
 
 def test_VP_init(plotter: VoxelPlotter):
     assert isinstance(plotter.selector, LayerSelector)
     assert isinstance(plotter.axes, Axes)
     assert not plotter.cursor_pos
+    assert not plotter.selection_layer
 
 
 def test_VP_draw(plotter: VoxelPlotter):
@@ -62,6 +71,7 @@ def test_VP_draw(plotter: VoxelPlotter):
     assert not plotter.axes.get_ymajorticklabels()
 
     # test time series plot
+    # TODO: plotting test for Points and Shapes
     plotter.axes.clear()
     plotter.cursor_pos = np.array([0, 0, 0])
     plotter.layers = [plotter.viewer.layers[1], plotter.viewer.layers[2]]
@@ -121,6 +131,7 @@ def test_VP_shift_move_callback(plotter: VoxelPlotter, qtbot: qtbot):
         plotter._shift_move_callback(plotter.viewer, event)
     assert np.all(plotter.cursor_pos == (10, 10, 10))
 
+#TODO: Add Point and Shape move callback test
 
 def test_VP_update_options(plotter: VoxelPlotter):
     options_dict = dict(
@@ -129,17 +140,20 @@ def test_VP_update_options(plotter: VoxelPlotter):
         y_lim=(20, 25),
         truncate=True,
         trunc_len=2,
+        mode='Shapes',
     )
     assert plotter.autoscale != options_dict['autoscale']
     assert plotter.x_lim != options_dict['x_lim']
     assert plotter.y_lim != options_dict['y_lim']
     assert plotter.max_label_len != options_dict['trunc_len']
+    assert plotter.mode != options_dict['mode']
 
     plotter.update_options(options_dict)
     assert plotter.autoscale == options_dict['autoscale']
     assert plotter.x_lim == options_dict['x_lim']
     assert plotter.y_lim == options_dict['y_lim']
     assert plotter.max_label_len == options_dict['trunc_len']
+    assert plotter.mode == options_dict['mode']
 
 
 def test_TSPOptions(qtbot: qtbot):
