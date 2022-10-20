@@ -44,6 +44,7 @@ class LayerSelector(QtWidgets.QListView):
             elif action == 'reordered':
                 pass  # TODO:  reordering callback not implemented yet
         else:
+            self.model().clear()
             for layer in get_valid_image_layers(self.napari_viewer.layers):
                 item = SelectorListItem(layer)
                 self.model().insertRow(0, item)
@@ -121,7 +122,7 @@ class VoxelPlotter(NapariMPLWidget):
                         # iterate over ROIs in shapes layer
                         for idx_shape in range(self.selection_layer.nshapes):
                             # calculate finally the mean value
-                            roi_ts = extract_mean_ROI_shape_time_series(
+                            roi_ts = extract_ROI_time_series(
                                 self.viewer.dims.current_step,
                                 layer,
                                 labels,
