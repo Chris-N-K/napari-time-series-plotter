@@ -73,6 +73,7 @@ class VoxelPlotter(NapariMPLWidget):
         self.selector = selector
         self.axes = self.canvas.figure.subplots()
         self.cursor_pos = np.array([])
+        self.selection_layer = None
         self.update_layers(None)
 
         if options:
@@ -83,7 +84,6 @@ class VoxelPlotter(NapariMPLWidget):
             self.y_lim = (None, None)
             self.max_label_len = None
             self.mode = 'Voxel'
-            self.selection_layer = None
 
     def clear(self):
         """
