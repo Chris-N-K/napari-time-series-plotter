@@ -9,10 +9,14 @@ from ..utils import *
 # fixtures
 @pytest.fixture
 def layer_list():
+    larr = np.zeros((10, 10, 10),dtype=int)
+    larr[1, 0:5, 0:5] = 1
     return [
         Image(data=np.random.randint(0, 100, (10, 10)), name='2D'),
+        Image(data=np.random.randint(0, 100, (10, 10, 10)), name='3D'),
         Image(data=np.random.randint(0, 100, (10, 10, 10, 10)), name='4D'),
-        Labels(data=np.random.randint(0, 100, (10, 10, 10, 10)), name='L4D')
+        Labels(data=larr, name='L3D'),
+        Labels(data=np.expand_dims(larr, axis=0), name='L4D'),
     ]
 
 
@@ -25,19 +29,43 @@ def test_get_valid_image_layers(layer_list):
 
 
 def test_extract_voxel_time_series(layer_list):
-    layer = layer_list[1]
+    layer3d = layer_list[1]
+    layer4d = layer_list[2]
 
     # mock cursor position
-    cursor_pos_1 = np.array([3.2, 7.1, 2.9, 1.0])
-    cursor_pos_2 = np.array([3.1, -3.4, 5.0, 2.7])
+    cursor_pos_1_3d = np.array([7.1, 2.9, 1.0])
+    cursor_pos_2_3d = np.array([-3.4, 5.0, 2.7])
+    cursor_pos_1_4d = np.array([3.2, 7.1, 2.9, 1.0])
+    cursor_pos_2_4d = np.array([3.1, -3.4, 5.0, 2.7])
 
     # extracted data should be equal mock data
-    vts = extract_voxel_time_series(cursor_pos_1, layer)
-    assert np.all(vts == layer.data[:, 7, 3, 1])
+    vts_3d = extract_voxel_time_series(cursor_pos_1_3d, layer3d)
+    assert np.all(vts_3d == layer3d.data[:, 3, 1])
+    vts_4d = extract_voxel_time_series(cursor_pos_1_4d, layer4d)
+    assert np.all(vts_4d == layer4d.data[:, 7, 3, 1])
 
     # cursor position outside of the array index should yield no data
-    vts = extract_voxel_time_series(cursor_pos_2, layer)
-    assert not vts
+    vts_3d = extract_voxel_time_series(cursor_pos_2_3d, layer3d)
+    assert not vts_3d
+    vts_4d = extract_voxel_time_series(cursor_pos_2_4d, layer4d)
+    assert not vts_4d
+
+def test_extract_ROI_time_series(layer_list):
+    # set up parameters
+    current_step = (0, 1, 10, 10)
+    layer3d = layer_list[1]
+    layer4d = layer_list[2]
+    labels = layer_list[3].data[1,...]
+    idx_shape = 0
+    mock_ROI_time_series_3d = layer3d.data[:, 0:5, 0:5].reshape(10, -1).mean(axis=1)
+    mock_ROI_time_series_4d = layer4d.data[:, 1, 0:5, 0:5].reshape(10, -1).mean(axis=1)
+
+    # mean of extracted ROI should be identical to mean of mock area
+    rts_3d = extract_ROI_time_series(current_step, layer3d, labels, idx_shape)
+    assert np.all(rts_3d == mock_ROI_time_series_3d)
+    rts_4d = extract_ROI_time_series(current_step, layer4d, labels, idx_shape)
+    assert np.all(rts_4d == mock_ROI_time_series_4d)
+
 
 
 def test_SelectorListItem(layer_list):
@@ -59,12 +87,12 @@ def test_SelectorListItem(layer_list):
 
 
 def test_SelectorListModel(layer_list):
-    items = [SelectorListItem(layer) for layer in layer_list]
+    items = [SelectorListItem(layer) for layer in layer_list[1:3]]
     items[1].setCheckState(Qt.Checked)
     model = SelectorListModel(items)
 
     # test init
-    assert model.rowCount() == 3
+    assert model.rowCount() == 2
 
     # test get_checked
     assert len(model.get_checked()) == 1
