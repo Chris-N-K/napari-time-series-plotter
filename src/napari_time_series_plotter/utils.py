@@ -8,7 +8,7 @@ from napari.layers import Shapes, Image
 __all__ = (
     'get_valid_image_layers',
     'extract_voxel_time_series',
-    'extract_mean_ROI_shape_time_series',
+    'extract_ROI_time_series',
     'SelectorListItem',
     'SelectorListModel'
 )
@@ -43,12 +43,12 @@ def extract_voxel_time_series(cpos, layer):
         return data[(slice(None),) + ind[1:]]
 
 
-def extract_mean_ROI_shape_time_series(current_step, layer, labels, idx_shape):
+def extract_ROI_time_series(current_step, layer, labels, idx_shape):
     """Extract the array element values inside a ROI along the first axis of a napari viewer layer.
 
     :param current_step: napari viewer current step
     :param layer: a napari image layer
-    :param labels: the label for the given shape
+    :param labels: 2D label array derived from a shapes layer (Shapes.to_labels())
     :param idx_shape: the index value for a given shape
     """
 
@@ -57,7 +57,7 @@ def extract_mean_ROI_shape_time_series(current_step, layer, labels, idx_shape):
 
     # convert ROI label to mask
     if ndim == 3:
-        mask = np.tile(labels == (idx_shape + 1), dshape)
+        mask = np.tile(labels == (idx_shape + 1), (dshape[0], 1, 1))
     else:  # 4d
         # respect the current step --> 2D ROI on 3D volume
         raw_mask = np.zeros((1, *dshape[1:]), dtype=bool)
@@ -67,7 +67,6 @@ def extract_mean_ROI_shape_time_series(current_step, layer, labels, idx_shape):
     # extract mean and append to the list of ROIS    
     return layer.data[mask].reshape(dshape[0], -1).mean(axis=1)
 
-# TODO: It might be possible to use the same functionality in all three extractions as world to data will make a 2d point / label to nd matching the image
 
 # classes
 class SelectorListItem(QtGui.QStandardItem):
