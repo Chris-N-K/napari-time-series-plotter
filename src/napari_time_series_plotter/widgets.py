@@ -33,22 +33,21 @@ class LayerSelector(QtWidgets.QListView):
         :param layer: changed layer (inserted or removed from layer list)
         :param action: type of change (inserted / removed) -> add or remove item to model
         """
-        # add or remove layer from model
         if layer:
-            if action == 'inserted':
+            if action == 'inserted':  # add layer to model
                 item = SelectorListItem(layer)
                 self.model().insertRow(0, item)
-            elif action == 'removed':
+            elif action == 'removed':  # remove layer from model
                 item_idx = self.model().get_item_idx_by_text(layer.name)
                 self.model().removeRow(item_idx)
             elif action == 'reordered':
                 pass  # TODO:  reordering callback not implemented yet
-        else:
+        else:  # if no layer was given generate completely new model
             self.model().clear()
             for layer in get_valid_image_layers(self.napari_viewer.layers):
                 item = SelectorListItem(layer)
                 self.model().insertRow(0, item)
-        # match size to item count
+        # match widget size to item count
         self.setMaximumHeight(
             self.sizeHintForRow(0) * self.model().rowCount() + 2 * self.frameWidth())
         self.model().itemChanged.emit(QtGui.QStandardItem())
@@ -92,9 +91,11 @@ class VoxelPlotter(NapariMPLWidget):
         self.axes.clear()
 
     def draw(self):
-        """
-        Draw a value over time line plot for the voxels of all layers in the layer attribute at the position stored
-        in the cursor_pos attribute. The first dimension is handled as time.
+        """Draw intensity over time line plots for the selected voxel(s) or ROI(s) of all layers in the layer attribute.
+
+        The plotting mode is handled via the mode attribute. Three modes are available voxel, shapes (ROIs) and points (multiple voxels).
+        In the voxel plotting mode the voxel is selected through the current cursor_pos value, in shapes and points plotting mode the selection
+        is based on an selection layer. The first dimension is handled as time.
         """
         handles = []
 
@@ -144,7 +145,7 @@ class VoxelPlotter(NapariMPLWidget):
         if handles:
             self.axes.set_title(f'Position: {self.cursor_pos}')
             self.axes.tick_params(
-                axis='both',  # changes apply to the x-axis
+                axis='both',  # changes apply to both axes
                 which='both',  # both major and minor ticks are affected
                 bottom=True,  # ticks along the bottom edge are off
                 top=False,  # ticks along the top edge are off
@@ -159,7 +160,8 @@ class VoxelPlotter(NapariMPLWidget):
                 self.axes.set_xlim(self.x_lim)
                 self.axes.set_ylim(self.y_lim)
             self.axes.legend(loc=1)
-        else:
+        else:  # if there are no graphs to display show info text
+            # TODO: add mode specific info texts
             self.axes.annotate(
                 'Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series',
                 (0.5, 0.5),
@@ -168,7 +170,7 @@ class VoxelPlotter(NapariMPLWidget):
                 size=15,
             )
             self.axes.tick_params(
-                axis='both',  # changes apply to the x-axis
+                axis='both',  # changes apply to both axes
                 which='both',  # both major and minor ticks are affected
                 bottom=False,  # ticks along the bottom edge are off
                 top=False,  # ticks along the top edge are off
@@ -185,6 +187,45 @@ class VoxelPlotter(NapariMPLWidget):
         self.layers = self.selector.model().get_checked()
         self._draw()
 
+    def update_options(self, options_dict: dict):
+        """Update attributes based on input.
+        After setting the attributes to new values the 'set_mode' and '_draw' methods are called to compute changes.
+
+        :param options_dict: Dictionary containing new attribute values
+        """
+        self.autoscale = options_dict['autoscale']
+        self.x_lim = options_dict['x_lim']
+        self.y_lim = options_dict['y_lim']
+        if options_dict['truncate']:
+            self.max_label_len = options_dict['trunc_len']
+        else:
+            self.max_label_len = None
+        # call to process changes
+        self.set_mode(options_dict['mode'])
+        self._draw()
+
+    def set_mode(self, mode: str):
+        """Set the plotting mode to input.
+        For the three available plotting modes different functions and layers are needed, this method activates activates them based on the
+        input string in 'mode'.
+        
+        :param mode: Mode name ['Voxel', 'Shapes', 'Points'] 
+        """
+        self.mode = mode
+        if mode == 'Voxel':
+            self._remove_selection_layer()
+        else:
+            if mode == 'Shapes' and 'ROI selection' not in self.viewer.layers:
+                if self.selection_layer:  # remove points selection layer if present
+                    self._remove_selection_layer()
+                self.selection_layer = self.viewer.add_shapes(data=None, face_color='transparent', name='ROI selection')
+                self.selection_layer.events.data.connect(self._data_changed_callback)
+            elif mode == 'Points' and 'Points selection' not in self.viewer.layers:
+                if self.selection_layer:  # remove shapes selection layer if present
+                    self._remove_selection_layer()
+                self.selection_layer = self.viewer.add_points(data=None, size=1, name='Points selection')
+                self.selection_layer.events.data.connect(self._data_changed_callback)
+
     def setup_callbacks(self):
         """
         Setup callbacks for:
@@ -192,8 +233,9 @@ class VoxelPlotter(NapariMPLWidget):
          - dim step changes
         """
         self.viewer.mouse_move_callbacks.append(self._shift_move_callback)
-        # TODO: would be good to only connect the callback if voxel mode is selected
+        # TODO: good to only connect the callback if voxel mode is selected?
         self.viewer.dims.events.current_step.connect(self._draw)
+        self.viewer.layers.events.removed.connect(self._guard_selection_layer_callback)
 
     def _shift_move_callback(self, viewer, event):
         """Receiver for napari.viewer.mouse_move_callbacks, checks for 'Shift' event modifier.
@@ -208,43 +250,30 @@ class VoxelPlotter(NapariMPLWidget):
     def _data_changed_callback(self, event):
         """
         Redraw plot if data changed.
+        Compatibility wrapper, to accpet event value.
         """
         self._draw()
 
-    def update_options(self, options_dict):
-        # print('update options')
-        self.autoscale = options_dict['autoscale']
-        self.x_lim = options_dict['x_lim']
-        self.y_lim = options_dict['y_lim']
-        if options_dict['truncate']:
-            self.max_label_len = options_dict['trunc_len']
-        else:
-            self.max_label_len = None
-        self.set_mode(options_dict['mode'])
-        self._draw()
-
-    def set_mode(self, mode):
-        # TODO: add safty for deletion of selection layer
-        self.mode = mode
-        if mode == 'Voxel':
+    def _guard_selection_layer_callback(self, event):
+        """
+        Readd the selection layer when removed despite still in corresponding mode.
+        """
+        if event.value == self.selection_layer:
+            self.viewer.add_layer(self.selection_layer)
+    
+    def _remove_selection_layer(self):
+        """
+        Savely remove selection_layer from the viewer and set the attribute to None.
+        """
+        if self.selection_layer:
+            tmp = self.selection_layer
             self.selection_layer = None
-            for layer in self.viewer.layers:
-                if layer.name in ['Roi selection', 'Points selection']:
-                    self.viewer.layers.remove(layer)
-        elif mode == 'Shapes' and 'ROI selection' not in self.viewer.layers:
-            if self.selection_layer:
-                self.viewer.layers.remove(self.selection_layer)
-            self.selection_layer = self.viewer.add_shapes(data=None, face_color='transparent', name='ROI selection')
-            self.selection_layer.events.data.connect(self._data_changed_callback)
-        elif mode == 'Points' and 'Points selection' not in self.viewer.layers:
-            if self.selection_layer:
-                self.viewer.layers.remove(self.selection_layer)
-            self.selection_layer = self.viewer.add_points(data=None, size=1, name='Points selection')
-            self.selection_layer.events.data.connect(self._data_changed_callback)
+            self.viewer.layers.remove(tmp)
 
 
 
 class OptionsManager(QtWidgets.QWidget):
+    # TODO: add in-code doc
     """
 
     """
@@ -262,28 +291,20 @@ class OptionsManager(QtWidgets.QWidget):
         self.le_autoscale_x_max = QtWidgets.QLineEdit()
         self.le_autoscale_y_min = QtWidgets.QLineEdit()
         self.le_autoscale_y_max = QtWidgets.QLineEdit()
-        
         self.cb_trunc = QtWidgets.QCheckBox()
         self.cb_trunc.setChecked(False)
-        
         self.le_trunc = QtWidgets.QLineEdit()
-
-        # Add toggle widget to layout
         self.mode = QtWidgets.QComboBox()
         self.mode.addItems(['Voxel', 'Shapes', 'Points'])
 
-        # connect callbacks
-        # plotter options
+        # connect callbacks for option changes
         self.cb_autoscale.stateChanged.connect(self.poc_callback)
         self.le_autoscale_x_min.editingFinished.connect(self.poc_callback)
         self.le_autoscale_x_max.editingFinished.connect(self.poc_callback)
         self.le_autoscale_y_min.editingFinished.connect(self.poc_callback)
         self.le_autoscale_y_max.editingFinished.connect(self.poc_callback)
         self.cb_trunc.stateChanged.connect(self.poc_callback)
-        
         self.mode.currentIndexChanged.connect(self.poc_callback)
-
-        # self.stateChanged.connect(self.debug)
 
         # layout
         layout = QtWidgets.QFormLayout()
