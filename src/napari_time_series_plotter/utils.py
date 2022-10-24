@@ -3,8 +3,6 @@ import numpy as np
 from qtpy import QtCore, QtGui
 from qtpy.QtCore import Qt
 
-from napari.layers import Shapes, Image
-
 __all__ = (
     'get_valid_image_layers',
     'extract_voxel_time_series',
@@ -33,6 +31,8 @@ def extract_voxel_time_series(cpos, layer):
     :type cpos: numpy.ndarray
     :param layer: Napari image layer to extract data from.
     :type layer: napari.layers.image.Image
+    :return: time series index, voxel time series
+    :rtype: tuple
     """
     # get full data array from layer
     data = layer.data
@@ -40,7 +40,7 @@ def extract_voxel_time_series(cpos, layer):
     ind = tuple(map(int, np.round(layer.world_to_data(cpos))))
     # return extracted data if index matches array
     if all([0 <= i < max_i for i, max_i in zip(ind, data.shape)]):
-        return data[(slice(None),) + ind[1:]]
+        return ind, data[(slice(None),) + ind[1:]]
 
 
 def extract_ROI_time_series(current_step, layer, labels, idx_shape):
@@ -50,6 +50,8 @@ def extract_ROI_time_series(current_step, layer, labels, idx_shape):
     :param layer: a napari image layer
     :param labels: 2D label array derived from a shapes layer (Shapes.to_labels())
     :param idx_shape: the index value for a given shape
+    :return: shape index, ROI mean time series
+    :rtype: tuple
     """
 
     ndim = layer.ndim
@@ -64,8 +66,9 @@ def extract_ROI_time_series(current_step, layer, labels, idx_shape):
         raw_mask[0, current_step[1], ...] = labels == (idx_shape + 1)
         mask = np.repeat(raw_mask, dshape[0], axis=0)
 
-    # extract mean and append to the list of ROIS    
-    return layer.data[mask].reshape(dshape[0], -1).mean(axis=1)
+    # extract mean and append to the list of ROIS
+    if mask.any():
+        return layer.data[mask].reshape(dshape[0], -1).mean(axis=1)
 
 
 # classes
@@ -128,7 +131,7 @@ class SelectorListModel(QtGui.QStandardItemModel):
         :type search_text: str
 
         :return: All items with item.text matching text
-        :return type: list
+        :return type: int or list of int
 
         """
         matches = []
