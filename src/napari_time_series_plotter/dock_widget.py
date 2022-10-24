@@ -57,6 +57,10 @@ class TSPExplorer(QtWidgets.QWidget):
         self.options.plotter_option_changed.connect(self.plotter.update_options)
 
     def _layer_list_changed_callback(self, event):
+        """Callback function for layer list changes.
+
+        Update the selector model on each layer list change to insert or remove items accordingly.
+        """
         if event.type in ['inserted', 'removed', 'reordered']:
             value = event.value
             etype = event.type
