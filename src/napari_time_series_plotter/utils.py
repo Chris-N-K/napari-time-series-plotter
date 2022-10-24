@@ -2,6 +2,7 @@ import numpy as np
 
 from qtpy import QtCore, QtGui
 from qtpy.QtCore import Qt
+from typing import Tuple, Union
 
 __all__ = (
     'get_valid_image_layers',
@@ -32,7 +33,7 @@ def extract_voxel_time_series(cpos, layer):
     :param layer: Napari image layer to extract data from.
     :type layer: napari.layers.image.Image
     :return: time series index, voxel time series
-    :rtype: tuple
+    :rtype: Tuple[tuple, np.ndarray]
     """
     # get full data array from layer
     data = layer.data
@@ -51,7 +52,7 @@ def extract_ROI_time_series(current_step, layer, labels, idx_shape):
     :param labels: 2D label array derived from a shapes layer (Shapes.to_labels())
     :param idx_shape: the index value for a given shape
     :return: shape index, ROI mean time series
-    :rtype: tuple
+    :rtype: np.ndarray
     """
 
     ndim = layer.ndim
@@ -114,8 +115,10 @@ class SelectorListModel(QtGui.QStandardItemModel):
                 self.appendRow(item)
 
     def get_checked(self):
-        """
-        Return all items with state QtCore.Qt.Checked.
+        """Return all items with state QtCore.Qt.Checked.
+
+        :return: All checked items
+        :rtype: List[bool]
         """
         checked = []
         for index in range(self.rowCount()):
@@ -131,7 +134,7 @@ class SelectorListModel(QtGui.QStandardItemModel):
         :type search_text: str
 
         :return: All items with item.text matching text
-        :return type: int or list of int
+        :rtype: Union[List[int]]
 
         """
         matches = []
