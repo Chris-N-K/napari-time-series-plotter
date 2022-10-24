@@ -2,6 +2,7 @@ import numpy as np
 
 from napari_matplotlib.base import NapariMPLWidget
 from qtpy import QtCore, QtGui, QtWidgets
+from warnings import warn
 
 from .utils import *
 
@@ -70,11 +71,9 @@ class VoxelPlotter(NapariMPLWidget):
     def __init__(self, napari_viewer, selector, options=None):
         super().__init__(napari_viewer)
         self.selector = selector
-        self.axes = self.canvas.figure.subplots()
         self.cursor_pos = np.array([])
         self.selection_layer = None
-        self.update_layers(None)
-
+        self.axes = self.canvas.figure.subplots()
         if options:
             self.update_options(options)
         else:
@@ -83,6 +82,7 @@ class VoxelPlotter(NapariMPLWidget):
             self.y_lim = (None, None)
             self.max_label_len = None
             self.mode = 'Voxel'
+        self.update_layers(None)
 
     def clear(self):
         """
@@ -110,7 +110,7 @@ class VoxelPlotter(NapariMPLWidget):
                 # plot voxel / pixel time series
                 if self.mode == 'Voxel' and self.cursor_pos.size != 0:
                     # extract voxel time series
-                    vts = extract_voxel_time_series(self.cursor_pos, layer)
+                    vidx, vts = extract_voxel_time_series(self.cursor_pos, layer)
                     # add graph
                     if not isinstance(vts, type(None)):
                         handles.extend(self.axes.plot(vts, label=lname))
@@ -118,32 +118,40 @@ class VoxelPlotter(NapariMPLWidget):
                 # plot mean value from square ROI(s) in shape layers
                 elif self.selection_layer and len(self.selection_layer.data) > 0:
                     if self.mode == 'Shapes':
-                        # convert shape to 2d labels to be used later for the mask
-                        labels = self.selection_layer.to_labels(layer.data.shape[-2:])
-                        # iterate over ROIs in shapes layer
-                        for idx_shape in range(self.selection_layer.nshapes):
-                            # calculate finally the mean value
-                            roi_ts = extract_ROI_time_series(
-                                self.viewer.dims.current_step,
-                                layer,
-                                labels,
-                                idx_shape
-                            )
-                            if not isinstance(roi_ts, type(None)):
-                                # add graph
-                                handles.extend(self.axes.plot(roi_ts, label=f'{lname}_ROI-{idx_shape}'))
+                        if np.any(layer.translate) or np.any(list(map(lambda x: x != 1, layer.scale))):
+                            # TODO: We have to wait for the translate and sclae support on napari side
+                            warn('ROI plotting does not support layers with translate or scale values!\n'
+                                 f'Skiped layer: {layer.name}')
+                        else:
+                            # convert shape to 2d labels to be used later for the mask
+                            labels = self.selection_layer.to_labels(layer.data.shape[-2:])
+                            # iterate over ROIs in shapes layer
+                            for idx_shape in range(self.selection_layer.nshapes):
+                                # calculate finally the mean value
+                                roi_ts = extract_ROI_time_series(
+                                    self.viewer.dims.current_step,
+                                    layer,
+                                    labels,
+                                    idx_shape
+                                )
+                                if not isinstance(roi_ts, type(None)):
+                                    # add graph
+                                    handles.extend(self.axes.plot(roi_ts, label=f'{lname}_ROI-{idx_shape}'))
                     elif self.mode == 'Points':
                         for idx_point, point in enumerate(self.selection_layer.data):
-                            if layer.ndim == 4:
-                                point = (self.viewer.dims.current_step[1], *point)
                             # extract voxel time series for each point
-                            vts = extract_voxel_time_series(point, layer)
+                            vidx, vts = extract_voxel_time_series(point, layer)
                             # add graph
                             if not isinstance(vts, type(None)):
-                                handles.extend(self.axes.plot(vts, label=f'{lname}_P{np.round(point)}'))
+                                handles.extend(self.axes.plot(vts, label=f'{lname}_P{idx_point} {vidx[1:]}'))
 
         if handles:
-            self.axes.set_title(f'Position: {self.cursor_pos}')
+            title_dict = dict(
+                Voxel=f'Position: {self.cursor_pos}',
+                Shapes='ROI mean time series',
+                Points='Voxel time series'
+            )
+            self.axes.set_title(title_dict[self.mode])
             self.axes.tick_params(
                 axis='both',  # changes apply to both axes
                 which='both',  # both major and minor ticks are affected
@@ -161,9 +169,13 @@ class VoxelPlotter(NapariMPLWidget):
                 self.axes.set_ylim(self.y_lim)
             self.axes.legend(loc=1)
         else:  # if there are no graphs to display show info text
-            # TODO: add mode specific info texts
+            info_dict = dict(
+                Voxel='Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series.',
+                Shapes='Add a shape to the "ROI selection" layer\nand move it over the image\nto plot the ROI time series.',
+                Points='Add points to the "Points selection" layer\nto plot the time series at each point.',
+            )
             self.axes.annotate(
-                'Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series',
+                info_dict[self.mode],
                 (0.5, 0.5),
                 ha='center',
                 va='center',
@@ -218,12 +230,14 @@ class VoxelPlotter(NapariMPLWidget):
             if mode == 'Shapes' and 'ROI selection' not in self.viewer.layers:
                 if self.selection_layer:  # remove points selection layer if present
                     self._remove_selection_layer()
+                # TODO: add support for multi dim shapes layers --> add shapes layer with dims matching bigges image, automatic dim modification
                 self.selection_layer = self.viewer.add_shapes(data=None, face_color='transparent', name='ROI selection')
                 self.selection_layer.events.data.connect(self._data_changed_callback)
             elif mode == 'Points' and 'Points selection' not in self.viewer.layers:
                 if self.selection_layer:  # remove shapes selection layer if present
                     self._remove_selection_layer()
-                self.selection_layer = self.viewer.add_points(data=None, size=1, name='Points selection')
+                # TODO: add automatic point layer dimension modification to fit the max dim
+                self.selection_layer = self.viewer.add_points(data=None, size=1, name='Points selection', ndim=4)
                 self.selection_layer.events.data.connect(self._data_changed_callback)
 
     def setup_callbacks(self):
@@ -233,7 +247,7 @@ class VoxelPlotter(NapariMPLWidget):
          - dim step changes
         """
         self.viewer.mouse_move_callbacks.append(self._shift_move_callback)
-        # TODO: good to only connect the callback if voxel mode is selected?
+        # TODO: better to only connect the callback if voxel mode is selected?
         self.viewer.dims.events.current_step.connect(self._draw)
         self.viewer.layers.events.removed.connect(self._guard_selection_layer_callback)
 
@@ -273,9 +287,20 @@ class VoxelPlotter(NapariMPLWidget):
 
 
 class OptionsManager(QtWidgets.QWidget):
-    # TODO: add in-code doc
-    """
+    """TSP options managing widget.
 
+    This widget displayes the current option values. The user is able to modify them and each change will trigger the
+    plotter_options_changed signal. The plotter_options_changed signal sends the current options in form of a dictionary.
+
+    Options:
+    - cb_autoscale -> checkbox, do figure axes auto scale, default true
+    - le_autoscale_x_min -> line edit, x axis min value (only if cb_autoscale false)
+    - le_autoscale_x_max -> line edit, x axis max value (only if cb_autoscale false)
+    - le_autoscale_y_min -> line edit, y axis min value (only if cb_autoscale false)
+    - le_autoscale_y_max -> line edit, y axis max value (only if cb_autoscale false)
+    - cb_trunc -> checkbox, truncate layer names in legend, default false
+    - le_trunc -> max layer name length in legend (only if cb_trunc true)
+    - mode -> combobox, plotting mode selection (Voxel, Shapes, Points), default Voxel
     """
     # signals
     plotter_option_changed = QtCore.Signal(dict)
@@ -320,9 +345,15 @@ class OptionsManager(QtWidgets.QWidget):
         self.setLayout(layout)
 
     def poc_callback(self):
+        """
+        Callback for option value changes, emits signal with plotter_optons() as value.
+        """
         self.plotter_option_changed.emit(self.plotter_options())
 
     def plotter_options(self):
+        """
+        Return dictionary with current option values.
+        """
         return dict(
             autoscale=self.cb_autoscale.isChecked(),
             x_lim=(
