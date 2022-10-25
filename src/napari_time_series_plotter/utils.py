@@ -63,10 +63,10 @@ def extract_ROI_time_series(current_step, layer, labels, idx_shape):
     # convert ROI label to mask
     if ndim == 3:
         mask = np.tile(labels == (idx_shape + 1), (dshape[0], 1, 1))
-    else:  # 4d
-        # respect the current step --> 2D ROI on 3D volume
+    else:  # nD
+        # respect the current step --> 2D ROI on nD volume
         raw_mask = np.zeros((1, *dshape[1:]), dtype=bool)
-        raw_mask[0, current_step[1], ...] = labels == (idx_shape + 1)
+        raw_mask[0, current_step[1:-2], ...] = labels == (idx_shape + 1)
         mask = np.repeat(raw_mask, dshape[0], axis=0)
 
     # extract mean and append to the list of ROIS
