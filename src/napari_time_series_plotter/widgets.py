@@ -143,7 +143,7 @@ class VoxelPlotter(NapariMPLWidget):
                             vidx, vts = extract_voxel_time_series(point, layer)
                             # add graph
                             if not isinstance(vts, type(None)):
-                                handles.extend(self.axes.plot(vts, label=f'{lname}_P{idx_point} {vidx[1:]}'))
+                                handles.extend(self.axes.plot(vts, label=f'{lname}_P{idx_point}-{vidx[1:]}'))
 
         if handles:
             title_dict = dict(
@@ -225,7 +225,8 @@ class VoxelPlotter(NapariMPLWidget):
         """
         self.mode = mode
         if mode == 'Voxel':
-            self._remove_selection_layer()
+            if self._remove_selection_layer():
+                self.cursor_pos = np.array([])
         else:
             if mode == 'Shapes' and 'ROI selection' not in self.viewer.layers:
                 if self.selection_layer:  # remove points selection layer if present
@@ -283,6 +284,8 @@ class VoxelPlotter(NapariMPLWidget):
             tmp = self.selection_layer
             self.selection_layer = None
             self.viewer.layers.remove(tmp)
+            return True
+        return False
 
 
 
