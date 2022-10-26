@@ -119,7 +119,7 @@ class VoxelPlotter(NapariMPLWidget):
                 elif self.selection_layer and len(self.selection_layer.data) > 0:
                     if self.mode == 'Shapes':
                         if np.any(layer.translate) or np.any(list(map(lambda x: x != 1, layer.scale))):
-                            # TODO: We have to wait for the translate and sclae support on napari side
+                            # TODO: We have to wait for the translate and scale support on napari side
                             warn('ROI plotting does not support layers with translate or scale values!\n'
                                  f'Skiped layer: {layer.name}')
                         else:
@@ -231,13 +231,13 @@ class VoxelPlotter(NapariMPLWidget):
             if mode == 'Shapes' and 'ROI selection' not in self.viewer.layers:
                 if self.selection_layer:  # remove points selection layer if present
                     self._remove_selection_layer()
-                # TODO: add support for multi dim shapes layers --> add shapes layer with dims matching bigges image, automatic dim modification
+                # TODO: improve support of nD layers --> add shapes layer with dims matching biggest image, automatic dim modification
                 self.selection_layer = self.viewer.add_shapes(data=None, face_color='transparent', name='ROI selection')
                 self.selection_layer.events.data.connect(self._data_changed_callback)
             elif mode == 'Points' and 'Points selection' not in self.viewer.layers:
                 if self.selection_layer:  # remove shapes selection layer if present
                     self._remove_selection_layer()
-                # TODO: add automatic point layer dimension modification to fit the max dim
+                # TODO: improve support of nD layers --> add automatic point layer dimension modification to fit the max dim
                 self.selection_layer = self.viewer.add_points(data=None, size=1, name='Points selection', ndim=4)
                 self.selection_layer.events.data.connect(self._data_changed_callback)
 
@@ -248,9 +248,10 @@ class VoxelPlotter(NapariMPLWidget):
          - dim step changes
         """
         self.viewer.mouse_move_callbacks.append(self._shift_move_callback)
-        # TODO: better to only connect the callback if voxel mode is selected?
         self.viewer.dims.events.current_step.connect(self._draw)
-        self.viewer.layers.events.removed.connect(self._guard_selection_layer_callback)
+
+        # FIXME: has to stay deactivated for now, as the re-adding of a layer based on the removed signal causes errors
+        #self.viewer.layers.events.removed.connect(self._guard_selection_layer_callback)
 
     def _shift_move_callback(self, viewer, event):
         """Receiver for napari.viewer.mouse_move_callbacks, checks for 'Shift' event modifier.
@@ -274,7 +275,7 @@ class VoxelPlotter(NapariMPLWidget):
         Readd the selection layer when removed despite still in corresponding mode.
         """
         if event.value == self.selection_layer:
-            self.viewer.add_layer(self.selection_layer)
+            self.viewer.add_layer(event.value)
     
     def _remove_selection_layer(self):
         """
