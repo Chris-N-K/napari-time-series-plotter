@@ -39,15 +39,15 @@ def test_extract_voxel_time_series(layer_list):
     cursor_pos_2_4d = np.array([3.1, -3.4, 5.0, 2.7])
 
     # extracted data should be equal mock data
-    vts_3d = extract_voxel_time_series(cursor_pos_1_3d, layer3d)
-    assert np.all(vts_3d == layer3d.data[:, 3, 1])
-    vts_4d = extract_voxel_time_series(cursor_pos_1_4d, layer4d)
-    assert np.all(vts_4d == layer4d.data[:, 7, 3, 1])
+    idx_3d, vts_3d = extract_voxel_time_series(cursor_pos_1_3d, layer3d)
+    assert all([idx_3d == (7, 3, 1), np.all(vts_3d == layer3d.data[:, 3, 1])])
+    idx_4d, vts_4d = extract_voxel_time_series(cursor_pos_1_4d, layer4d)
+    assert all([idx_4d == (3, 7, 3, 1), np.all(vts_4d == layer4d.data[:, 7, 3, 1])])
 
     # cursor position outside of the array index should yield no data
-    vts_3d = extract_voxel_time_series(cursor_pos_2_3d, layer3d)
+    idx_3d, vts_3d = extract_voxel_time_series(cursor_pos_2_3d, layer3d)
     assert not vts_3d
-    vts_4d = extract_voxel_time_series(cursor_pos_2_4d, layer4d)
+    idx_4d, vts_4d = extract_voxel_time_series(cursor_pos_2_4d, layer4d)
     assert not vts_4d
 
 

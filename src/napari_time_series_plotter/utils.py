@@ -43,7 +43,7 @@ def extract_voxel_time_series(cpos, layer):
     if all([0 <= i < max_i for i, max_i in zip(ind, data.shape)]):
         return ind, data[(slice(None),) + ind[1:]]
     else:
-        ind, None
+        return ind, None
 
 
 def extract_ROI_time_series(current_step, layer, labels, idx_shape):
