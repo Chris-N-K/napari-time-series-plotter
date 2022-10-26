@@ -250,7 +250,7 @@ class VoxelPlotter(NapariMPLWidget):
         self.viewer.mouse_move_callbacks.append(self._shift_move_callback)
         self.viewer.dims.events.current_step.connect(self._draw)
 
-        # FIXME: has to stay deactivated for now, as the re-adding of a layer based on the removed signal causes errors
+        # BUG: disabled, the re-adding of a layer based on the removed signal causes errors
         #self.viewer.layers.events.removed.connect(self._guard_selection_layer_callback)
 
     def _shift_move_callback(self, viewer, event):
@@ -270,12 +270,13 @@ class VoxelPlotter(NapariMPLWidget):
         """
         self._draw()
 
-    def _guard_selection_layer_callback(self, event):
-        """
-        Readd the selection layer when removed despite still in corresponding mode.
-        """
-        if event.value == self.selection_layer:
-            self.viewer.add_layer(event.value)
+    # BUG: disabled, causes errors
+    #def _guard_selection_layer_callback(self, event):
+    #    """
+    #    Readd the selection layer when removed despite still in corresponding mode.
+    #    """
+    #    if event.value == self.selection_layer:
+    #        self.viewer.add_layer(event.value)
     
     def _remove_selection_layer(self):
         """
