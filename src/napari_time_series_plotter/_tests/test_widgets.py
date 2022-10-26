@@ -96,7 +96,7 @@ def test_LayerSelector(napari_viewer, selector: LayerSelector, qtbot: qtbot):
 def test_VP_init(plotter: VoxelPlotter):
     assert isinstance(plotter.selector, LayerSelector)
     assert isinstance(plotter.axes, Axes)
-    assert not plotter.cursor_pos
+    assert not np.any(plotter.cursor_pos)
     assert not plotter.selection_layer
 
 
@@ -275,6 +275,7 @@ def test_VP_update_options(plotter: VoxelPlotter):
         truncate=True,
         trunc_len=2,
         mode='Shapes',
+        roi_mode='Median',
     )
     assert plotter.autoscale != options_dict['autoscale']
     assert plotter.x_lim != options_dict['x_lim']
@@ -301,6 +302,7 @@ def test_OptionsManager(qtbot: qtbot):
             status['truncate'] is False,
             status['trunc_len'] is None,
             status['mode'] == 'Voxel',
+            status['roi_mode'] == 'Mean',
         ])
 
     # test init

@@ -46,20 +46,26 @@ def extract_voxel_time_series(cpos, layer):
         return ind, None
 
 
-def extract_ROI_time_series(current_step, layer, labels, idx_shape):
+def extract_ROI_time_series(current_step, layer, labels, idx_shape, roi_mode):
     """Extract the array element values inside a ROI along the first axis of a napari viewer layer.
 
     :param current_step: napari viewer current step
     :param layer: a napari image layer
     :param labels: 2D label array derived from a shapes layer (Shapes.to_labels())
     :param idx_shape: the index value for a given shape
+    :param roi_mode: defines how to handle the values inside of the ROI -> calc mean (default), median, sum or std
     :return: shape index, ROI mean time series
     :rtype: np.ndarray
     """
 
     ndim = layer.ndim
     dshape = layer.data.shape
-
+    mode_dict = dict(
+        Mean=np.mean,
+        Median=np.median,
+        Sum=np.sum,
+        Std=np.std,
+    )
     # convert ROI label to mask
     if ndim == 3:
         mask = np.tile(labels == (idx_shape + 1), (dshape[0], 1, 1))
@@ -71,7 +77,7 @@ def extract_ROI_time_series(current_step, layer, labels, idx_shape):
 
     # extract mean and append to the list of ROIS
     if mask.any():
-        return layer.data[mask].reshape(dshape[0], -1).mean(axis=1)
+        return mode_dict[roi_mode](layer.data[mask].reshape(dshape[0], -1), axis=1)
 
 
 # classes

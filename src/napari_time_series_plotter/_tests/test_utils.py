@@ -59,19 +59,25 @@ def test_extract_ROI_time_series(layer_list):
     labels = layer_list[3].data[1,...]
     empty_labels = np.zeros((10, 10), dtype=np.uint8)
     idx_shape = 0
-    mock_ROI_time_series_3d = layer3d.data[:, 0:5, 0:5].reshape(10, -1).mean(axis=1)
-    mock_ROI_time_series_4d = layer4d.data[:, 1, 0:5, 0:5].reshape(10, -1).mean(axis=1)
+    mock_ROI_time_series_3d_mean = np.mean(layer3d.data[:, 0:5, 0:5].reshape(10, -1), axis=1)
+    mock_ROI_time_series_3d_median = np.median(layer3d.data[:, 0:5, 0:5].reshape(10, -1), axis=1)
+    mock_ROI_time_series_3d_sum = np.sum(layer3d.data[:, 0:5, 0:5].reshape(10, -1), axis=1)
+    mock_ROI_time_series_4d_std = np.std(layer4d.data[:, 1, 0:5, 0:5].reshape(10, -1), axis=1)
 
     # mean of extracted ROI should be identical to mean of mock area
-    rts_3d = extract_ROI_time_series(current_step, layer3d, labels, idx_shape)
-    assert np.all(rts_3d == mock_ROI_time_series_3d)
-    rts_4d = extract_ROI_time_series(current_step, layer4d, labels, idx_shape)
-    assert np.all(rts_4d == mock_ROI_time_series_4d)
+    rts_3d = extract_ROI_time_series(current_step, layer3d, labels, idx_shape, 'Mean')
+    assert np.all(rts_3d == mock_ROI_time_series_3d_mean)
+    rts_3d = extract_ROI_time_series(current_step, layer3d, labels, idx_shape, 'Median')
+    assert np.all(rts_3d == mock_ROI_time_series_3d_median)
+    rts_3d = extract_ROI_time_series(current_step, layer3d, labels, idx_shape, 'Sum')
+    assert np.all(rts_3d == mock_ROI_time_series_3d_sum)
+    rts_4d = extract_ROI_time_series(current_step, layer4d, labels, idx_shape, 'Std')
+    assert np.all(rts_4d == mock_ROI_time_series_4d_std)
 
     # shapes outside of image bounds should not yield any data
-    rts_3d = extract_ROI_time_series(current_step, layer3d, empty_labels, idx_shape)
+    rts_3d = extract_ROI_time_series(current_step, layer3d, empty_labels, idx_shape, 'Mean')
     assert not rts_3d
-    rts_4d = extract_ROI_time_series(current_step, layer4d, empty_labels, idx_shape)
+    rts_4d = extract_ROI_time_series(current_step, layer4d, empty_labels, idx_shape, 'Mean')
     assert not rts_4d
 
 

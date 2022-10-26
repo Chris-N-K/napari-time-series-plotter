@@ -67,6 +67,12 @@ class VoxelPlotter(NapariMPLWidget):
         axes : matplotlib.axes.Axes
         selector : napari_time_series_plotter.LayerSelector
         cursor_pos : tuple of current mouse cursor position in the napari viewer
+        autoscale : bool, to autoscale if true or if x/y lim are empty
+        x_lim : tuple, min and max value for x axis (only if autoscale false)
+        y_lim : tuple, min and max value for y axis (only if autoscale false)
+        max_label_len : maximal length of labels in the figure legend
+        mode : plotting mode (Voxel, Shapes, Points)
+        roi_mode : ROI value calculation mode for Shapes plotting mode
     """
     def __init__(self, napari_viewer, selector, options=None):
         super().__init__(napari_viewer)
@@ -82,6 +88,7 @@ class VoxelPlotter(NapariMPLWidget):
             self.y_lim = (None, None)
             self.max_label_len = None
             self.mode = 'Voxel'
+            self.roi_mode = 'Mean'
         self.update_layers(None)
 
     def clear(self):
@@ -132,7 +139,8 @@ class VoxelPlotter(NapariMPLWidget):
                                     self.viewer.dims.current_step,
                                     layer,
                                     labels,
-                                    idx_shape
+                                    idx_shape,
+                                    self.roi_mode,
                                 )
                                 if not isinstance(roi_ts, type(None)):
                                     # add graph
@@ -214,6 +222,7 @@ class VoxelPlotter(NapariMPLWidget):
             self.max_label_len = None
         # call to process changes
         self.set_mode(options_dict['mode'])
+        self.roi_mode = options_dict['roi_mode']
         self._draw()
 
     def set_mode(self, mode: str):
@@ -306,6 +315,7 @@ class OptionsManager(QtWidgets.QWidget):
     - cb_trunc -> checkbox, truncate layer names in legend, default false
     - le_trunc -> max layer name length in legend (only if cb_trunc true)
     - mode -> combobox, plotting mode selection (Voxel, Shapes, Points), default Voxel
+    - roi_mode -> combobox, roi calculation mode selection (mean, median, sum, std)
     """
     # signals
     plotter_option_changed = QtCore.Signal(dict)
@@ -326,6 +336,8 @@ class OptionsManager(QtWidgets.QWidget):
         self.le_trunc = QtWidgets.QLineEdit()
         self.mode = QtWidgets.QComboBox()
         self.mode.addItems(['Voxel', 'Shapes', 'Points'])
+        self.roi_mode = QtWidgets.QComboBox()
+        self.roi_mode.addItems(['Mean', 'Median', 'Sum', 'Std'])
 
         # connect callbacks for option changes
         self.cb_autoscale.stateChanged.connect(self.poc_callback)
@@ -335,6 +347,7 @@ class OptionsManager(QtWidgets.QWidget):
         self.le_autoscale_y_max.editingFinished.connect(self.poc_callback)
         self.cb_trunc.stateChanged.connect(self.poc_callback)
         self.mode.currentIndexChanged.connect(self.poc_callback)
+        self.roi_mode.currentIndexChanged.connect(self.poc_callback)
 
         # layout
         layout = QtWidgets.QFormLayout()
@@ -347,6 +360,7 @@ class OptionsManager(QtWidgets.QWidget):
         layout.addRow('Truncate layer names', self.cb_trunc)
         layout.addRow('max length', self.le_trunc)
         layout.addRow('Plotting mode', self.mode)
+        layout.addRow('ROI plotting mode', self.roi_mode)
         self.setLayout(layout)
 
     def poc_callback(self):
@@ -372,4 +386,5 @@ class OptionsManager(QtWidgets.QWidget):
             truncate=self.cb_trunc.isChecked(),
             trunc_len=int(self.le_trunc.text()) if self.le_trunc.text() else None,
             mode=self.mode.currentText(),
+            roi_mode=self.roi_mode.currentText(),
         )
