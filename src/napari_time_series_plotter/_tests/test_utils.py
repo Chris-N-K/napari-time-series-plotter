@@ -50,12 +50,14 @@ def test_extract_voxel_time_series(layer_list):
     vts_4d = extract_voxel_time_series(cursor_pos_2_4d, layer4d)
     assert not vts_4d
 
+
 def test_extract_ROI_time_series(layer_list):
     # set up parameters
     current_step = (0, 1, 10, 10)
     layer3d = layer_list[1]
     layer4d = layer_list[2]
     labels = layer_list[3].data[1,...]
+    empty_labels = np.zeros((10, 10), dtype=np.uint8)
     idx_shape = 0
     mock_ROI_time_series_3d = layer3d.data[:, 0:5, 0:5].reshape(10, -1).mean(axis=1)
     mock_ROI_time_series_4d = layer4d.data[:, 1, 0:5, 0:5].reshape(10, -1).mean(axis=1)
@@ -66,6 +68,11 @@ def test_extract_ROI_time_series(layer_list):
     rts_4d = extract_ROI_time_series(current_step, layer4d, labels, idx_shape)
     assert np.all(rts_4d == mock_ROI_time_series_4d)
 
+    # shapes outside of image bounds should not yield any data
+    rts_3d = extract_ROI_time_series(current_step, layer3d, empty_labels, idx_shape)
+    assert not rts_3d
+    rts_4d = extract_ROI_time_series(current_step, layer4d, empty_labels, idx_shape)
+    assert not rts_4d
 
 
 def test_SelectorListItem(layer_list):
@@ -97,3 +104,18 @@ def test_SelectorListModel(layer_list):
     # test get_checked
     assert len(model.get_checked()) == 1
     assert model.get_checked()[0].name == '4D'
+
+    # test get_item_idx_by_text
+    # match
+    matches = model.get_item_idx_by_text('4D')
+    assert matches
+    assert isinstance(matches, int)
+    # no match
+    matches = model.get_item_idx_by_text('')
+    assert not matches
+    # double match
+    items[0].setText('4D')
+    matches = model.get_item_idx_by_text('4D')
+    assert matches
+    assert isinstance(matches, list)
+    assert len(matches) == 2

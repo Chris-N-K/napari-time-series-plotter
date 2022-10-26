@@ -5,6 +5,7 @@ from pytestqt import qtbot
 from qtpy.QtCore import Signal, QObject
 
 from matplotlib.axes import Axes
+from matplotlib.text import Annotation
 
 from ..widgets import LayerSelector, VoxelPlotter, OptionsManager
 from ..utils import SelectorListModel
@@ -29,6 +30,40 @@ def selector(napari_viewer):
 @pytest.fixture
 def plotter(napari_viewer, selector: LayerSelector):
     yield VoxelPlotter(napari_viewer, selector)
+
+@pytest.fixture
+def mock_signal():
+    class MockSignal(QObject):
+        emitter = Signal()
+
+    yield MockSignal()
+
+
+# helper functions
+def run_info_plot_tests(axis, mode):
+    info_dict = dict(
+                Voxel='Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series.',
+                Shapes='Add a shape to the "ROI selection" layer\nand move it over the image\nto plot the ROI time series.',
+                Points='Add points to the "Points selection" layer\nto plot the time series at each point.',
+            )
+    annotation = None
+    for child in axis.get_children():
+        if isinstance(child, Annotation):
+            annotation = child
+    assert annotation
+    assert annotation.get_text() == info_dict[mode]
+
+
+def run_data_plot_tests(axis, title, labels):
+    assert axis.get_title() == title
+    assert axis.get_xlabel() == 'Time'
+    assert axis.get_ylabel() == 'Pixel / Voxel Values'
+    assert axis.get_xmajorticklabels()
+    assert axis.get_ymajorticklabels()
+    handles = axis.get_legend_handles_labels()
+    assert len(handles) == len(labels)
+    assert handles[1][0] == labels[0]
+    assert handles[1][1] == labels[1]
 
 
 # tests
@@ -62,36 +97,77 @@ def test_VP_init(plotter: VoxelPlotter):
     assert not plotter.selection_layer
 
 
-def test_VP_draw(plotter: VoxelPlotter):
-    # TODO: Add test for the actual annotate and plot
-    plotter = plotter
-    # test message plot
-    plotter.draw()
-    assert not plotter.axes.get_xmajorticklabels()
-    assert not plotter.axes.get_ymajorticklabels()
+#def test_VP_set_mode(plotter: VoxelPlotter, qtbot: qtbot):
+#    pass
 
-    # test time series plot
-    # TODO: plotting test for Points and Shapes
-    plotter.axes.clear()
-    plotter.cursor_pos = np.array([0, 0, 0])
-    plotter.layers = [plotter.viewer.layers[1], plotter.viewer.layers[2]]
+
+def test_VP_draw(plotter: VoxelPlotter):
+    # TODO: Low Prio; add test for the actual annotate and plot
+    plotter = plotter
+    viewer = plotter.viewer
+    plotter.layers = [viewer.layers[1], viewer.layers[2]]
+    axes = plotter.axes
     plotter.draw()
-    assert plotter.axes.get_title() == 'Position: [0 0 0]'
-    assert plotter.axes.get_xlabel() == 'Time'
-    assert plotter.axes.get_ylabel() == 'Pixel / Voxel Values'
-    handles = plotter.axes.get_legend_handles_labels()
-    assert len(handles) == 2
-    assert handles[1][0] == '3D_image'
-    assert handles[1][1] == '4D_image'
+    # start plot should be info plot without axe annotations and title
+    assert not axes.get_title()
+    assert not axes.get_xmajorticklabels()
+    assert not axes.get_ymajorticklabels()
+
+    # test Voxel mode
+    # default info text should be for voxel plotting
+    run_info_plot_tests(axes, 'Voxel')
+
+    # test data plot
+    axes.clear()
+    plotter.cursor_pos = np.array([0, 0, 0])
+    plotter.draw()
+    run_data_plot_tests(axes, 'Position: [0 0 0]', [viewer.layers[1].name, viewer.layers[2].name])
+    
+    # test Shapes mode
+    plotter.set_mode('Shapes')
+    plotter.draw()
+    run_info_plot_tests(axes, 'Shapes')
+    plotter.selection_layer.add_rectangles(
+        np.array([
+            [0, 0],
+            [0, 3],
+            [3, 3],
+            [3, 0]
+        ])
+    )
+    plotter.draw()
+    run_data_plot_tests(
+        axes, 
+        'ROI mean time series', 
+        [
+            f'{viewer.layers[1].name}_ROI-0', 
+            f'{viewer.layers[2].name}_ROI-0'
+        ]
+    )
+
+    # test points mode
+    plotter.set_mode('Points')
+    plotter.draw()
+    run_info_plot_tests(axes, 'Points')
+    plotter.selection_layer.add([0,0,3,3])
+    plotter.draw()
+    run_data_plot_tests(
+        axes,
+        'Voxel time series', 
+        [
+            f'{viewer.layers[1].name}_P0-(3, 3)', 
+            f'{viewer.layers[2].name}_P0-(0, 3, 3)', 
+        ]
+    )
 
     # test label truncate
-    plotter.axes.clear()
+    axes.clear()
     plotter.max_label_len = 2
     plotter.draw()
     handles = plotter.axes.get_legend_handles_labels()
     assert len(handles) == 2
-    assert handles[1][0] == '3D'
-    assert handles[1][1] == '4D'
+    assert handles[1][0] == '3D_P0-(3, 3)'
+    assert handles[1][1] == '4D_P0-(0, 3, 3)'
 
     # test non auto scale
     plotter.axes.clear()
@@ -105,20 +181,15 @@ def test_VP_draw(plotter: VoxelPlotter):
     assert plotter.axes.get_ylim() == y_lim
 
 
-def test_VP_shift_move_callback(plotter: VoxelPlotter, qtbot: qtbot):
-    # mock vent
+def test_VP_shift_move_callback(plotter: VoxelPlotter, qtbot: qtbot, mock_signal: QObject):
+    # mock event
     class MockEvent:
         def __init__(self):
             self.modifiers = 'Shift'
 
     # monkeypatch plotter._draw()
-    class MockSignal(QObject):
-        emitter = Signal()
-
-    signal = MockSignal()
-
     def monkey_draw():
-        signal.emitter.emit()
+        mock_signal.emitter.emit()
 
     plotter._draw = monkey_draw
 
@@ -127,11 +198,35 @@ def test_VP_shift_move_callback(plotter: VoxelPlotter, qtbot: qtbot):
     plotter.layers = [plotter.viewer.layers[1]]
     plotter.viewer.cursor.position = (10.1, 10.4, 9.8)
 
-    with qtbot.waitSignal(signal.emitter, timeout=100):
+    with qtbot.waitSignal(mock_signal.emitter, timeout=100):
         plotter._shift_move_callback(plotter.viewer, event)
     assert np.all(plotter.cursor_pos == (10, 10, 10))
 
-#TODO: Add Point and Shape move callback test
+
+def test_VP_data_changed_callback(plotter: VoxelPlotter, qtbot: qtbot, mock_signal: QObject):
+    # monkeypatch plotter._draw()
+    def monkey_draw():
+        mock_signal.emitter.emit()
+
+    plotter._draw = monkey_draw
+
+    # test shapes data change
+    plotter.set_mode('Shapes')
+    with qtbot.waitSignal(mock_signal.emitter, timeout=100):
+        plotter.selection_layer.add_rectangles(
+        np.array([
+            [0, 0],
+            [0, 3],
+            [3, 3],
+            [3, 0]
+        ])
+    )
+
+    # test points data change
+    plotter.set_mode('Points')
+    with qtbot.waitSignal(mock_signal.emitter, timeout=100):
+        plotter.selection_layer.add([0,0,3,3])
+
 
 def test_VP_update_options(plotter: VoxelPlotter):
     options_dict = dict(
@@ -156,7 +251,7 @@ def test_VP_update_options(plotter: VoxelPlotter):
     assert plotter.mode == options_dict['mode']
 
 
-def test_TSPOptions(qtbot: qtbot):
+def test_OptionsManager(qtbot: qtbot):
     tspoptions = OptionsManager()
 
     def check_return(status: dict):
@@ -166,15 +261,16 @@ def test_TSPOptions(qtbot: qtbot):
             status['y_lim'] == (None, None),
             status['truncate'] is False,
             status['trunc_len'] is None,
+            status['mode'] == 'Voxel',
         ])
 
     # test init
-    # TODO: run meaningful init tests
+    # TODO: Low Prio; add meaningful init tests
 
     # test plotter_options
     assert check_return(tspoptions.plotter_options())
 
     # test poc_callback
-    # TODO: add qtbot mouse click and line edit tests
+    # TODO: Low Prio; add qtbot mouse click and line edit tests
     with qtbot.waitSignal(tspoptions.plotter_option_changed, timeout=100, check_params_cb=check_return):
         tspoptions.poc_callback()
