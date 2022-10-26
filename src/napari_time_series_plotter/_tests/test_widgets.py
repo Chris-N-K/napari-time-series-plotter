@@ -88,6 +88,9 @@ def test_LayerSelector(napari_viewer, selector: LayerSelector, qtbot: qtbot):
     with qtbot.waitSignal(selector.model().itemChanged, timeout=100):
         selector.update_model(new_layer, 'removed')
     assert selector.model().rowCount() == 2
+    # layer reordered
+    with qtbot.waitSignal(selector.model().itemChanged, timeout=100):
+        selector.update_model(new_layer, 'reordered')
 
 
 def test_VP_init(plotter: VoxelPlotter):
@@ -97,8 +100,34 @@ def test_VP_init(plotter: VoxelPlotter):
     assert not plotter.selection_layer
 
 
-#def test_VP_set_mode(plotter: VoxelPlotter, qtbot: qtbot):
-#    pass
+def test_VP_set_mode(plotter: VoxelPlotter, qtbot: qtbot):
+    viewer = plotter.viewer
+    # test default
+    assert plotter.mode == 'Voxel'
+    assert not 'ROI selection' in viewer.layers
+    assert not 'Points selection' in viewer.layers
+    
+    # test change to shapes mode
+    # add Points selection to test auto removal
+    plotter.selection_layer = viewer.add_points(data=None, name='Points selection')
+    plotter.set_mode('Shapes')
+    assert 'ROI selection' in viewer.layers
+    assert not 'Points selection' in viewer.layers
+    assert any(['_data_changed_callback' in callback for callback in viewer.layers['ROI selection'].events.data.callbacks])
+    
+    # test change to points mode
+    plotter.set_mode('Points')
+    assert not 'ROI selection' in viewer.layers
+    assert 'Points selection' in viewer.layers
+    assert any(['_data_changed_callback' in callback for callback in viewer.layers['Points selection'].events.data.callbacks])
+
+    # test change to voxel mode
+    # set cursor_pos to test reset
+    plotter.cursor_pos = (10,10,10)
+    plotter.set_mode('Voxel')
+    assert not 'ROI selection' in viewer.layers
+    assert not 'Points selection' in viewer.layers
+    assert not np.any(plotter.cursor_pos)
 
 
 def test_VP_draw(plotter: VoxelPlotter):
@@ -144,6 +173,16 @@ def test_VP_draw(plotter: VoxelPlotter):
             f'{viewer.layers[2].name}_ROI-0'
         ]
     )
+    # test shapes mode warning for translate
+    viewer.layers['4D_image'].translate = [1,1,1,1]
+    with pytest.warns(match='ROI plotting does not support layers with translate or scale values!\nSkiped layer: 4D_image'):
+        plotter.draw()
+    viewer.layers['4D_image'].translate = [0,0,0,0]
+    # test shapes mode warning for translate
+    viewer.layers['4D_image'].scale = [2,2,2,2]
+    with pytest.warns(match='ROI plotting does not support layers with translate or scale values!\nSkiped layer: 4D_image'):
+        plotter.draw()
+    viewer.layers['4D_image'].scale = [1,1,1,1]
 
     # test points mode
     plotter.set_mode('Points')
