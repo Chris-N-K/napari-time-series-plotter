@@ -122,7 +122,7 @@ class VoxelPlotter(NapariMPLWidget):
                     if not isinstance(vts, type(None)):
                         handles.extend(self.axes.plot(vts, label=lname))
 
-                # plot mean value from square ROI(s) in shape layers
+                # plot roi_mode value from square ROI(s) in shape layers
                 elif self.selection_layer and len(self.selection_layer.data) > 0:
                     if self.mode == 'Shapes':
                         if np.any(layer.translate) or np.any(list(map(lambda x: x != 1, layer.scale))):
@@ -134,7 +134,7 @@ class VoxelPlotter(NapariMPLWidget):
                             labels = self.selection_layer.to_labels(layer.data.shape[-2:])
                             # iterate over ROIs in shapes layer
                             for idx_shape in range(self.selection_layer.nshapes):
-                                # calculate finally the mean value
+                                # calculate finally the roi_mode value
                                 roi_ts = extract_ROI_time_series(
                                     self.viewer.dims.current_step,
                                     layer,
@@ -289,7 +289,7 @@ class VoxelPlotter(NapariMPLWidget):
     
     def _remove_selection_layer(self):
         """
-        Savely remove selection_layer from the viewer and set the attribute to None.
+        Safely remove selection_layer from the viewer and set the attribute to None.
         """
         if self.selection_layer:
             tmp = self.selection_layer
@@ -371,7 +371,7 @@ class OptionsManager(QtWidgets.QWidget):
 
     def plotter_options(self):
         """
-        Return dictionary with current option values.
+        Return dictionary with current plotting option values.
         """
         return dict(
             autoscale=self.cb_autoscale.isChecked(),
