@@ -16,11 +16,11 @@ TSP adds live plotting of time-resolved images to napari. With the TSPExplorer w
 
 The TSPExplorer offers three different plotting modes: Voxel, Shapes, Points
 --> Voxel mode offers live plotting while moving the cursor over an image layer
---> Shapes mode offers shape-based ROI plotting; multiple ROIs can be plotted simultaneously
+--> Shapes mode offers shape-based ROI plotting the ROI combination method can be one of [Mean, Median, STD, Sum, Min, Max]; multiple ROIs can be plotted simultaneously
 --> Points mode offers simultaneous, point-based plotting of multiple voxels
 
 You can modify and save the plots through the canvas toolbar.
-Plotting powered by napari-matplotlib.
+Plotting powered by `napari-matplotlib`.
 
 ----------------------------------
 
@@ -44,7 +44,7 @@ Alternatively, you can install the plugin directly in the `napari` viewer plugin
 
 <br>
 
-To install the latest development version install directly from the relevant github branch.
+To install the latest development version install directly from the relevant GitHub branch.
 
 ## Usage
 <p align="center">
@@ -62,9 +62,10 @@ Voxel mode:
 Shapes mode:
 - Add one or more shapes to the ROI selection layer
 - Position it as you need
-- The plotter will display the mean intensity of the ROI over time for all selected layers
+- The plotter will display the combined intensity of the ROI over time for all selected layers
     - The shapes are 2D only; 3D ROIs are not supported
     - All shapes are on the currently displayed slice
+    - The ROI combination mode can be selected in the options tab, default: mean
 
 Points mode:
 - Add one or more points to the Point selection layer
@@ -72,16 +73,19 @@ Points mode:
     - The points can be on different slices (3D and 4D support only) or images (grid mode)
     - Adding or moving points will regenerate the plots
 
+- Set custom title or axe labels in the options tab
 - Switch between autoscaling and manually defined max and min values of the axes in the options tab
 - Switch to label truncation in the options tab if your layer names are too long for the figure legend (set max length manually)
+- Set a scaling factor for the X-axis in the options tab
 
 ## ToDo (help welcome)
 - [ ] Add Sphinx documentation
 
-## Version 0.1.0 Milstones
+## Version 0.1.0 Milestones
 - [X] Update to napari-plugin-engine2 [#5](https://github.com/ch-n/napari-time_series_plotter/issues/5)
 - [X] Update widget GUI [#6](https://github.com/ch-n/napari-time_series_plotter/issues/6)
-- [ ] Add widget to save pixel / voxel time series to file [#7](https://github.com/ch-n/napari-time_series_plotter/issues/7)
+- [ ] Add widget to save pixel/voxel time series to file [#7](https://github.com/ch-n/napari-time_series_plotter/issues/7)
+- [X] Add ROI and multi-voxel plotting [#14](https://github.com/ch-n/napari-time_series_plotter/issues/14)
 
 ## Contributing
 
