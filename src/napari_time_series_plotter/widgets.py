@@ -412,12 +412,12 @@ class OptionsManager(QtWidgets.QWidget):
             yaxis_label=self.yaxis_label.text(),
             autoscale=self.cb_autoscale.isChecked(),
             x_lim=(
-                int(self.le_autoscale_x_min.text()) if self.le_autoscale_x_min.text() else None,
-                int(self.le_autoscale_x_max.text()) if self.le_autoscale_x_max.text() else None,
+                float(self.le_autoscale_x_min.text()) if self.le_autoscale_x_min.text() else None,
+                float(self.le_autoscale_x_max.text()) if self.le_autoscale_x_max.text() else None,
             ),
             y_lim=(
-                int(self.le_autoscale_y_min.text()) if self.le_autoscale_y_min.text() else None,
-                int(self.le_autoscale_y_max.text()) if self.le_autoscale_y_max.text() else None,
+                float(self.le_autoscale_y_min.text()) if self.le_autoscale_y_min.text() else None,
+                float(self.le_autoscale_y_max.text()) if self.le_autoscale_y_max.text() else None,
             ),
             xscale=float(self.xscale.text()),
             truncate=self.cb_trunc.isChecked(),
