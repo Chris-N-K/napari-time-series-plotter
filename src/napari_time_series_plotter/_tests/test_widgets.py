@@ -54,10 +54,10 @@ def run_info_plot_tests(axis, mode):
     assert annotation.get_text() == info_dict[mode]
 
 
-def run_data_plot_tests(axis, title, labels):
+def run_data_plot_tests(axis, title, xlabel, ylabel, labels):
     assert axis.get_title() == title
-    assert axis.get_xlabel() == 'Time'
-    assert axis.get_ylabel() == 'Pixel / Voxel Values'
+    assert axis.get_xlabel() == xlabel
+    assert axis.get_ylabel() == ylabel
     assert axis.get_xmajorticklabels()
     assert axis.get_ymajorticklabels()
     handles = axis.get_legend_handles_labels()
@@ -135,6 +135,9 @@ def test_VP_draw(plotter: VoxelPlotter):
     plotter = plotter
     viewer = plotter.viewer
     plotter.layers = [viewer.layers[1], viewer.layers[2]]
+    xlabel = 'Time'
+    ylabel = 'Intensity'
+    roi_mode = plotter.roi_mode
     axes = plotter.axes
     plotter.draw()
     # start plot should be info plot without axe annotations and title
@@ -150,7 +153,37 @@ def test_VP_draw(plotter: VoxelPlotter):
     axes.clear()
     plotter.cursor_pos = np.array([0, 0, 0])
     plotter.draw()
-    run_data_plot_tests(axes, 'Position: [0 0 0]', [viewer.layers[1].name, viewer.layers[2].name])
+    run_data_plot_tests(
+        axes, 
+        'Cursor Position: [0 0 0]', 
+        xlabel, 
+        ylabel, 
+        [
+            viewer.layers[1].name, 
+            viewer.layers[2].name
+        ],
+    )
+
+    # test axe label chnages
+    axes.clear()
+    title_text = 'T1'
+    xlabel = 'T2'
+    xlabel = 'T3'
+    plotter.title_text = title_text
+    plotter.xaxis_label = xlabel
+    plotter.yaxis_label = ylabel
+    plotter.draw()
+    run_data_plot_tests(
+        axes, 
+        'T1', 
+        xlabel, 
+        ylabel, 
+        [
+            viewer.layers[1].name, 
+            viewer.layers[2].name
+        ],
+    )
+    plotter.title_text = None
     
     # test Shapes mode
     plotter.set_mode('Shapes')
@@ -164,15 +197,25 @@ def test_VP_draw(plotter: VoxelPlotter):
             [3, 0]
         ])
     )
+    axes.clear()
     plotter.draw()
     run_data_plot_tests(
-        axes, 
-        'ROI mean time series', 
+        axes,
+        f'ROI {roi_mode} time series',
+        xlabel,
+        ylabel,
         [
             f'{viewer.layers[1].name}_ROI-0', 
             f'{viewer.layers[2].name}_ROI-0'
-        ]
+        ],
     )
+
+    # test different roi mode
+    roi_mode = 'Median'
+    plotter.roi_mode = roi_mode
+    axes.clear()
+    plotter.draw()
+    assert axes.get_title() == f'ROI {roi_mode} time series'
     # test shapes mode warning for translate
     viewer.layers['4D_image'].translate = [1,1,1,1]
     with pytest.warns(match='ROI plotting does not support layers with translate or scale values!\nSkiped layer: 4D_image'):
@@ -193,10 +236,12 @@ def test_VP_draw(plotter: VoxelPlotter):
     run_data_plot_tests(
         axes,
         'Voxel time series', 
+        xlabel,
+        ylabel,
         [
             f'{viewer.layers[1].name}_P0-(3, 3)', 
             f'{viewer.layers[2].name}_P0-(0, 3, 3)', 
-        ]
+        ],
     )
 
     # test label truncate
@@ -269,26 +314,41 @@ def test_VP_data_changed_callback(plotter: VoxelPlotter, qtbot: qtbot, mock_sign
 
 def test_VP_update_options(plotter: VoxelPlotter):
     options_dict = dict(
+        title_text='T1',
+        xaxis_label='T2',
+        yaxis_label='T3',
         autoscale=False,
         x_lim=(5, 15),
         y_lim=(20, 25),
         truncate=True,
         trunc_len=2,
+        xscale=5,
         mode='Shapes',
         roi_mode='Median',
     )
+
+    assert plotter.title_text != options_dict['title_text']
+    assert plotter.xaxis_label != options_dict['xaxis_label']
+    assert plotter.yaxis_label != options_dict['yaxis_label']
     assert plotter.autoscale != options_dict['autoscale']
     assert plotter.x_lim != options_dict['x_lim']
     assert plotter.y_lim != options_dict['y_lim']
     assert plotter.max_label_len != options_dict['trunc_len']
+    assert plotter.xscale != options_dict['xscale']
     assert plotter.mode != options_dict['mode']
+    assert plotter.roi_mode != options_dict['roi_mode']
 
     plotter.update_options(options_dict)
+    assert plotter.title_text == options_dict['title_text']
+    assert plotter.xaxis_label == options_dict['xaxis_label']
+    assert plotter.yaxis_label == options_dict['yaxis_label']
     assert plotter.autoscale == options_dict['autoscale']
     assert plotter.x_lim == options_dict['x_lim']
     assert plotter.y_lim == options_dict['y_lim']
     assert plotter.max_label_len == options_dict['trunc_len']
+    assert plotter.xscale == options_dict['xscale']
     assert plotter.mode == options_dict['mode']
+    assert plotter.roi_mode == options_dict['roi_mode']
 
 
 def test_OptionsManager(qtbot: qtbot):
@@ -296,11 +356,15 @@ def test_OptionsManager(qtbot: qtbot):
 
     def check_return(status: dict):
         return all([
+            status['title_text'] is None,
+            status['xaxis_label'] == 'Time',
+            status['yaxis_label'] == 'Intensity',
             status['autoscale'] is True,
             status['x_lim'] == (None, None),
             status['y_lim'] == (None, None),
             status['truncate'] is False,
             status['trunc_len'] is None,
+            status['xscale'] == 1,
             status['mode'] == 'Voxel',
             status['roi_mode'] == 'Mean',
         ])

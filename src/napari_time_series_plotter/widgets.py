@@ -83,10 +83,14 @@ class VoxelPlotter(NapariMPLWidget):
         if options:
             self.update_options(options)
         else:
+            self.title_text = None
+            self.xaxis_label = 'Time'
+            self.yaxis_label = 'Intensity'
             self.autoscale = True
             self.x_lim = (None, None)
             self.y_lim = (None, None)
             self.max_label_len = None
+            self.xscale = 1
             self.mode = 'Voxel'
             self.roi_mode = 'Mean'
         self.update_layers(None)
@@ -117,10 +121,10 @@ class VoxelPlotter(NapariMPLWidget):
                 # plot voxel / pixel time series
                 if self.mode == 'Voxel' and self.cursor_pos.size != 0:
                     # extract voxel time series
-                    vidx, vts = extract_voxel_time_series(self.cursor_pos, layer)
+                    vidx, vts = extract_voxel_time_series(self.cursor_pos, layer, self.xscale)
                     # add graph
                     if not isinstance(vts, type(None)):
-                        handles.extend(self.axes.plot(vts, label=lname))
+                        handles.extend(self.axes.plot(vts[0], vts[1], label=lname))
 
                 # plot roi_mode value from square ROI(s) in shape layers
                 elif self.selection_layer and len(self.selection_layer.data) > 0:
@@ -141,25 +145,29 @@ class VoxelPlotter(NapariMPLWidget):
                                     labels,
                                     idx_shape,
                                     self.roi_mode,
+                                    self.xscale,
                                 )
                                 if not isinstance(roi_ts, type(None)):
                                     # add graph
-                                    handles.extend(self.axes.plot(roi_ts, label=f'{lname}_ROI-{idx_shape}'))
+                                    handles.extend(self.axes.plot(roi_ts[0], roi_ts[1], label=f'{lname}_ROI-{idx_shape}'))
                     elif self.mode == 'Points':
                         for idx_point, point in enumerate(self.selection_layer.data):
                             # extract voxel time series for each point
-                            vidx, vts = extract_voxel_time_series(point, layer)
+                            vidx, vts = extract_voxel_time_series(point, layer, self.xscale)
                             # add graph
                             if not isinstance(vts, type(None)):
-                                handles.extend(self.axes.plot(vts, label=f'{lname}_P{idx_point}-{vidx[1:]}'))
+                                handles.extend(self.axes.plot(vts[0], vts[1], label=f'{lname}_P{idx_point}-{vidx[1:]}'))
 
         if handles:
             title_dict = dict(
-                Voxel=f'Position: {self.cursor_pos}',
-                Shapes='ROI mean time series',
+                Voxel=f'Cursor Position: {self.cursor_pos}',
+                Shapes=f'ROI {self.roi_mode} time series',
                 Points='Voxel time series'
             )
-            self.axes.set_title(title_dict[self.mode])
+            if self.title_text:
+                self.axes.set_title(self.title_text)
+            else:
+                self.axes.set_title(title_dict[self.mode])
             self.axes.tick_params(
                 axis='both',  # changes apply to both axes
                 which='both',  # both major and minor ticks are affected
@@ -170,8 +178,8 @@ class VoxelPlotter(NapariMPLWidget):
                 right=False,
                 labelleft=True,
             )
-            self.axes.set_xlabel('Time')
-            self.axes.set_ylabel('Pixel / Voxel Values')
+            self.axes.set_xlabel(self.xaxis_label)
+            self.axes.set_ylabel(self.yaxis_label)
             if not self.autoscale:
                 self.axes.set_xlim(self.x_lim)
                 self.axes.set_ylim(self.y_lim)
@@ -213,6 +221,9 @@ class VoxelPlotter(NapariMPLWidget):
 
         :param options_dict: Dictionary containing new attribute values
         """
+        self.title_text = options_dict['title_text']
+        self.xaxis_label = options_dict['xaxis_label']
+        self.yaxis_label = options_dict['yaxis_label']
         self.autoscale = options_dict['autoscale']
         self.x_lim = options_dict['x_lim']
         self.y_lim = options_dict['y_lim']
@@ -220,6 +231,7 @@ class VoxelPlotter(NapariMPLWidget):
             self.max_label_len = options_dict['trunc_len']
         else:
             self.max_label_len = None
+        self.xscale = options_dict['xscale']
         # call to process changes
         self.set_mode(options_dict['mode'])
         self.roi_mode = options_dict['roi_mode']
@@ -323,42 +335,63 @@ class OptionsManager(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         # subwidgets
-        self.label_plotter_options = QtWidgets.QLabel('Plotter Options')
-        self.label_plotter_options.setStyleSheet(" font-weight: bold; text-decoration: underline; ")
+        self.label_axe_options = QtWidgets.QLabel('Axe Options')
+        self.label_axe_options.setStyleSheet(" font-weight: bold; text-decoration: underline; ")
+        self.title_text = QtWidgets.QLineEdit()
+        self.xaxis_label = QtWidgets.QLineEdit()
+        self.xaxis_label.setText('Time')
+        self.yaxis_label = QtWidgets.QLineEdit()
+        self.yaxis_label.setText('Intensity')
         self.cb_autoscale = QtWidgets.QCheckBox()
         self.cb_autoscale.setChecked(True)
         self.le_autoscale_x_min = QtWidgets.QLineEdit()
         self.le_autoscale_x_max = QtWidgets.QLineEdit()
         self.le_autoscale_y_min = QtWidgets.QLineEdit()
         self.le_autoscale_y_max = QtWidgets.QLineEdit()
+
+        self.label_plot_options = QtWidgets.QLabel('Plot Options')
+        self.label_plot_options.setStyleSheet(" font-weight: bold; text-decoration: underline; ")
         self.cb_trunc = QtWidgets.QCheckBox()
         self.cb_trunc.setChecked(False)
         self.le_trunc = QtWidgets.QLineEdit()
+        self.xscale = QtWidgets.QLineEdit()
+        self.xscale.setText('1')
         self.mode = QtWidgets.QComboBox()
         self.mode.addItems(['Voxel', 'Shapes', 'Points'])
         self.roi_mode = QtWidgets.QComboBox()
-        self.roi_mode.addItems(['Mean', 'Median', 'Sum', 'Std'])
+        self.roi_mode.addItems(['Mean', 'Median', 'Std', 'Min', 'Max', 'Sum'])
 
         # connect callbacks for option changes
+        self.title_text.editingFinished.connect(self.poc_callback)
+        self.xaxis_label.editingFinished.connect(self.poc_callback)
+        self.yaxis_label.editingFinished.connect(self.poc_callback)
         self.cb_autoscale.stateChanged.connect(self.poc_callback)
         self.le_autoscale_x_min.editingFinished.connect(self.poc_callback)
         self.le_autoscale_x_max.editingFinished.connect(self.poc_callback)
         self.le_autoscale_y_min.editingFinished.connect(self.poc_callback)
         self.le_autoscale_y_max.editingFinished.connect(self.poc_callback)
+        
         self.cb_trunc.stateChanged.connect(self.poc_callback)
+        self.le_trunc.editingFinished.connect(self.poc_callback)
+        self.xscale.editingFinished.connect(self.poc_callback)
         self.mode.currentIndexChanged.connect(self.poc_callback)
         self.roi_mode.currentIndexChanged.connect(self.poc_callback)
 
         # layout
         layout = QtWidgets.QFormLayout()
-        layout.addRow(self.label_plotter_options)
+        layout.addRow(self.label_axe_options)
+        layout.addRow('Plot title', self.title_text)
+        layout.addRow('X-axis label', self.xaxis_label)
+        layout.addRow('Y-axis label', self.yaxis_label)
         layout.addRow('Auto scale plot axes', self.cb_autoscale)
         layout.addRow('x_min', self.le_autoscale_x_min)
         layout.addRow('x_max', self.le_autoscale_x_max)
         layout.addRow('y_min', self.le_autoscale_y_min)
         layout.addRow('y_max', self.le_autoscale_y_max)
+        layout.addRow(self.label_plot_options)
         layout.addRow('Truncate layer names', self.cb_trunc)
-        layout.addRow('max length', self.le_trunc)
+        layout.addRow('Layer name length', self.le_trunc)
+        layout.addRow('Scaling factor X-axis', self.xscale)
         layout.addRow('Plotting mode', self.mode)
         layout.addRow('ROI plotting mode', self.roi_mode)
         self.setLayout(layout)
@@ -374,6 +407,9 @@ class OptionsManager(QtWidgets.QWidget):
         Return dictionary with current plotting option values.
         """
         return dict(
+            title_text=self.title_text.text() if self.title_text.text() else None,
+            xaxis_label=self.xaxis_label.text(),
+            yaxis_label=self.yaxis_label.text(),
             autoscale=self.cb_autoscale.isChecked(),
             x_lim=(
                 int(self.le_autoscale_x_min.text()) if self.le_autoscale_x_min.text() else None,
@@ -383,6 +419,7 @@ class OptionsManager(QtWidgets.QWidget):
                 int(self.le_autoscale_y_min.text()) if self.le_autoscale_y_min.text() else None,
                 int(self.le_autoscale_y_max.text()) if self.le_autoscale_y_max.text() else None,
             ),
+            xscale=float(self.xscale.text()),
             truncate=self.cb_trunc.isChecked(),
             trunc_len=int(self.le_trunc.text()) if self.le_trunc.text() else None,
             mode=self.mode.currentText(),

@@ -6,6 +6,7 @@ from typing import Tuple, Union
 
 __all__ = (
     'get_valid_image_layers',
+    'add_index_dim',
     'extract_voxel_time_series',
     'extract_ROI_time_series',
     'SelectorListItem',
@@ -22,7 +23,24 @@ def get_valid_image_layers(layer_list):
     return out
 
 
-def extract_voxel_time_series(cpos, layer):
+def add_index_dim(arr1d, scale):
+    """Add a dimension to a 1D array, containing scaled index values.
+    
+    :param arr1d: array with one dimension
+    :type arr1d: np.ndarray
+    :param scale: index scaling value
+    :type scale: float
+    :retun: 2D array with the index dim added at -1 position
+    :rtype: np.ndarray
+    """
+    idx = np.arange(0, arr1d.size, 1) * scale
+    out = np.zeros((2, arr1d.size))
+    out[0] = idx
+    out[1] = arr1d
+    return out
+
+
+def extract_voxel_time_series(cpos, layer, xscale):
     """Extract the array element values along the first axis of a napari viewer layer.
 
     First the data array is extracted from a napari image layer and the cursor position is
@@ -41,12 +59,12 @@ def extract_voxel_time_series(cpos, layer):
     ind = tuple(map(int, np.round(layer.world_to_data(cpos))))
     # return extracted data if index matches array
     if all([0 <= i < max_i for i, max_i in zip(ind, data.shape)]):
-        return ind, data[(slice(None),) + ind[1:]]
+        return ind, add_index_dim(data[(slice(None),) + ind[1:]], xscale)
     else:
         return ind, None
 
 
-def extract_ROI_time_series(current_step, layer, labels, idx_shape, roi_mode):
+def extract_ROI_time_series(current_step, layer, labels, idx_shape, roi_mode, xscale):
     """Extract the array element values inside a ROI along the first axis of a napari viewer layer.
 
     :param current_step: napari viewer current step
@@ -61,6 +79,8 @@ def extract_ROI_time_series(current_step, layer, labels, idx_shape, roi_mode):
     ndim = layer.ndim
     dshape = layer.data.shape
     mode_dict = dict(
+        Min=np.min,
+        Max=np.max,
         Mean=np.mean,
         Median=np.median,
         Sum=np.sum,
@@ -77,7 +97,7 @@ def extract_ROI_time_series(current_step, layer, labels, idx_shape, roi_mode):
 
     # extract mean and append to the list of ROIS
     if mask.any():
-        return mode_dict[roi_mode](layer.data[mask].reshape(dshape[0], -1), axis=1)
+        return add_index_dim(mode_dict[roi_mode](layer.data[mask].reshape(dshape[0], -1), axis=1), xscale)
 
 
 # classes
