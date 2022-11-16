@@ -12,6 +12,7 @@ def layer_list():
     return [
         Image(data=np.random.randint(0, 100, (10, 10)), name='2D'),
         Image(data=np.random.randint(0, 100, (10, 10, 10, 10)), name='4D'),
+        Image(data=np.random.randint(0, 100, (10, 10, 10, 3)), name='RGB4D', rgb=True),
         Labels(data=np.random.randint(0, 100, (10, 10, 10, 10)), name='L4D')
     ]
 
@@ -19,7 +20,7 @@ def layer_list():
 # tests
 def test_get_valid_image_layers(layer_list):
     assert all(
-        [layer.ndim >= 3 and layer._type_string == 'image'
+        [layer.ndim >= 3 and layer._type_string == 'image' and not layer.rgb
          for layer in get_valid_image_layers(layer_list)]
     )
 
@@ -64,7 +65,7 @@ def test_SelectorListModel(layer_list):
     model = SelectorListModel(items)
 
     # test init
-    assert model.rowCount() == 3
+    assert model.rowCount() == 4
 
     # test get_checked
     assert len(model.get_checked()) == 1
