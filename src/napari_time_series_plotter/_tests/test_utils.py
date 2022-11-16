@@ -15,6 +15,7 @@ def layer_list():
         Image(data=np.random.randint(0, 100, (10, 10)), name='2D'),
         Image(data=np.random.randint(0, 100, (10, 10, 10)), name='3D'),
         Image(data=np.random.randint(0, 100, (10, 10, 10, 10)), name='4D'),
+        Image(data=np.random.randint(0, 100, (10, 10, 10, 3)), name='RGB4D'),
         Labels(data=larr, name='L3D'),
         Labels(data=np.expand_dims(larr, axis=0), name='L4D'),
     ]
