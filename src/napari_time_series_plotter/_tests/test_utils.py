@@ -23,7 +23,7 @@ def layer_list():
 # tests
 def test_get_valid_image_layers(layer_list):
     assert all(
-        [layer.ndim >= 3 and layer._type_string == 'image'
+        [layer.ndim >= 3 and layer._type_string == 'image' and not layer.rgb
          for layer in get_valid_image_layers(layer_list)]
     )
 

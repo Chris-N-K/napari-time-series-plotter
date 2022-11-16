@@ -19,7 +19,7 @@ def get_valid_image_layers(layer_list):
     """
     Extract napari images layers of 3 or more dimensions from the input list.
     """
-    out = [layer for layer in layer_list if layer._type_string == 'image' and layer.data.ndim >= 3]
+    out = [layer for layer in layer_list if layer._type_string == 'image' and layer.data.ndim >= 3 and not layer.rgb]
     return out
 
 
