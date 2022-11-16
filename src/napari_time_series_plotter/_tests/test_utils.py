@@ -84,7 +84,7 @@ def test_extract_ROI_time_series(layer_list):
     current_step = (0, 1, 10, 10)
     layer3d = layer_list[1]
     layer4d = layer_list[2]
-    labels = layer_list[3].data[1,...]
+    labels = layer_list[4].data[1,...]
     empty_labels = np.zeros((10, 10), dtype=np.uint8)
     idx_shape = 0
 
