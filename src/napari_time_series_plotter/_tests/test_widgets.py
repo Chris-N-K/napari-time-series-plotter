@@ -44,7 +44,7 @@ def run_info_plot_tests(axis, mode):
     info_dict = dict(
                 Voxel='Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series.',
                 Shapes='Add a shape to the "ROI selection" layer\nand move it over the image\nto plot the ROI time series.',
-                Points='Add points to the "Points selection" layer\nto plot the time series at each point.',
+                Points='Add points to the "Voxel selection" layer\nto plot the time series at each point.',
             )
     annotation = None
     for child in axis.get_children():
@@ -105,28 +105,28 @@ def test_VP_set_mode(plotter: VoxelPlotter, qtbot: qtbot):
     # test default
     assert plotter.mode == 'Voxel'
     assert not 'ROI selection' in viewer.layers
-    assert not 'Points selection' in viewer.layers
+    assert not 'Voxel selection' in viewer.layers
     
     # test change to shapes mode
-    # add Points selection to test auto removal
-    plotter.selection_layer = viewer.add_points(data=None, name='Points selection')
+    # add Voxel selection to test auto removal
+    plotter.selection_layer = viewer.add_points(data=None, name='Voxel selection')
     plotter.set_mode('Shapes')
     assert 'ROI selection' in viewer.layers
-    assert not 'Points selection' in viewer.layers
+    assert not 'Voxel selection' in viewer.layers
     assert any(['_data_changed_callback' in callback for callback in viewer.layers['ROI selection'].events.data.callbacks])
     
     # test change to points mode
     plotter.set_mode('Points')
     assert not 'ROI selection' in viewer.layers
-    assert 'Points selection' in viewer.layers
-    assert any(['_data_changed_callback' in callback for callback in viewer.layers['Points selection'].events.data.callbacks])
+    assert 'Voxel selection' in viewer.layers
+    assert any(['_data_changed_callback' in callback for callback in viewer.layers['Voxel selection'].events.data.callbacks])
 
     # test change to voxel mode
     # set cursor_pos to test reset
     plotter.cursor_pos = (10,10,10)
     plotter.set_mode('Voxel')
     assert not 'ROI selection' in viewer.layers
-    assert not 'Points selection' in viewer.layers
+    assert not 'Voxel selection' in viewer.layers
     assert not np.any(plotter.cursor_pos)
 
 

@@ -188,7 +188,7 @@ class VoxelPlotter(NapariMPLWidget):
             info_dict = dict(
                 Voxel='Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series.',
                 Shapes='Add a shape to the "ROI selection" layer\nand move it over the image\nto plot the ROI time series.',
-                Points='Add points to the "Points selection" layer\nto plot the time series at each point.',
+                Points='Add points to the "Voxel selection" layer\nto plot the time series at each point.',
             )
             self.axes.annotate(
                 info_dict[self.mode],
@@ -250,16 +250,16 @@ class VoxelPlotter(NapariMPLWidget):
                 self.cursor_pos = np.array([])
         else:
             if mode == 'Shapes' and 'ROI selection' not in self.viewer.layers:
-                if self.selection_layer:  # remove points selection layer if present
+                if self.selection_layer:  # remove voxel selection layer if present
                     self._remove_selection_layer()
                 # TODO: improve support of nD layers --> add shapes layer with dims matching biggest image, automatic dim modification
                 self.selection_layer = self.viewer.add_shapes(data=None, face_color='transparent', name='ROI selection')
                 self.selection_layer.events.data.connect(self._data_changed_callback)
-            elif mode == 'Points' and 'Points selection' not in self.viewer.layers:
+            elif mode == 'Points' and 'Voxel selection' not in self.viewer.layers:
                 if self.selection_layer:  # remove shapes selection layer if present
                     self._remove_selection_layer()
                 # TODO: improve support of nD layers --> add automatic point layer dimension modification to fit the max dim
-                self.selection_layer = self.viewer.add_points(data=None, size=1, name='Points selection', ndim=4)
+                self.selection_layer = self.viewer.add_points(data=None, size=1, name='Voxel selection', ndim=4)
                 self.selection_layer.events.data.connect(self._data_changed_callback)
 
     def setup_callbacks(self):
