@@ -50,8 +50,19 @@ class TSPExplorer(QtWidgets.QWidget):
         layout.addWidget(self.selector)
         self.setLayout(layout)
 
-        # callbacks
+        # handle events
+        self.viewer.layers.events.inserted.connect(self._layer_list_changed_callback)
+        self.viewer.layers.events.removed.connect(self._layer_list_changed_callback)
         self.selector.model().itemChanged.connect(self.plotter.update_layers)
-        self.viewer.layers.events.inserted.connect(self.selector.update_model)
-        self.viewer.layers.events.removed.connect(self.selector.update_model)
         self.options.plotter_option_changed.connect(self.plotter.update_options)
+
+    def _layer_list_changed_callback(self, event):
+        """Callback function for layer list changes.
+
+        Update the selector model on each layer list change to insert or remove items accordingly.
+        """
+        if event.type in ['inserted', 'removed', 'reordered']:
+            value = event.value
+            etype = event.type
+            if value._type_string == 'image' and value.ndim in [3, 4]:
+                self.selector.update_model(value, etype)
