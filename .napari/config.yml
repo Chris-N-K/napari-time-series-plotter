@@ -1,0 +1,2 @@
+summary: A Plugin for napari to visualize pixel values over the first dimension (time
+  -> t+3D, t+2D) as graphs.

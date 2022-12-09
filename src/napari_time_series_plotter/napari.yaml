@@ -2,9 +2,10 @@ name: napari-time-series-plotter
 schema_version: 0.1.0
 contributions:
   commands:
-    - id: napari-time-series-plotter.TSPExplorer
-      title: Create TSPExplorer widget
-      python_name: napari_time_series_plotter.dock_widget:TSPExplorer
+  - id: napari-time-series-plotter.TSPExplorer
+    title: Create TSPExplorer widget
+    python_name: napari_time_series_plotter.dock_widget:TSPExplorer
   widgets:
-    - command: napari-time-series-plotter.TSPExplorer
-      display_name: TSPExplorer
+  - command: napari-time-series-plotter.TSPExplorer
+    display_name: TSPExplorer
+display_name: napari-time_series_plotter
