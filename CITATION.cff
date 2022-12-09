@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: If you use this plugin, please cite it using these metadata
+title: 'napari-time_series_plotter: A Plugin for napari to visualize pixel values
+  over the first dimension (time -> t+3D, t+2D) as graphs.'
+url: https://github.com/ch-n/napari-time_series_plotter
+authors:
+- given-names: Christopher
+  family-names: "Nauroth-Kre\xDF"
+- given-names: 'cnk  # We cannot split your name automatically bewteen ''given-names''
+    and ''family-names'', we apologize for that. Please do it manually'
+- given-names: 'ch-n  # We cannot split your name automatically bewteen ''given-names''
+    and ''family-names'', we apologize for that. Please do it manually'
+- given-names: David
+  family-names: "Haberth\xFCr"
+- given-names: Robert
+  family-names: Haase
+- given-names: 'NRadUKW  # We cannot split your name automatically bewteen ''given-names''
+    and ''family-names'', we apologize for that. Please do it manually'
