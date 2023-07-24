@@ -10,15 +10,17 @@ from matplotlib.text import Annotation
 from ..widgets import LayerSelector, VoxelPlotter, OptionsManager
 from ..utils import SelectorListModel
 
+RANDOM_GENERATOR = np.random.default_rng(seed=121)
+
 
 # fixtures
 @pytest.fixture
 def napari_viewer(make_napari_viewer):
     viewer = make_napari_viewer(show=False)
-    viewer.add_image(np.random.randint(0, 100, (10, 10)), name='2D_image')
-    viewer.add_image(np.random.randint(0, 100, (10, 10, 10)), name='3D_image')
-    viewer.add_image(np.random.randint(0, 100, (10, 10, 10, 10)), name='4D_image')
-    viewer.add_labels(np.random.randint(0, 100, (10, 10, 10, 10)), name='4D_labels')
+    viewer.add_image(RANDOM_GENERATOR.integers(0, 100, (10, 10), ), name='2D_image')
+    viewer.add_image(RANDOM_GENERATOR.integers(0, 100, (10, 10, 10)), name='3D_image')
+    viewer.add_image(RANDOM_GENERATOR.integers(0, 100, (10, 10, 10, 10)), name='4D_image')
+    viewer.add_labels(RANDOM_GENERATOR.integers(0, 100, (10, 10, 10, 10)), name='4D_labels')
     yield viewer
 
 
@@ -80,7 +82,7 @@ def test_LayerSelector(napari_viewer, selector: LayerSelector, qtbot: qtbot):
         selector.update_model(None, None)
     assert selector.model().rowCount() == 2
     # layer insertion
-    new_layer = Image(np.random.randint(0, 100, (10, 10, 10, 10)), name='new')
+    new_layer = Image(RANDOM_GENERATOR.integers(0, 100, (10, 10, 10, 10)), name='new')
     with qtbot.waitSignal(selector.model().itemChanged, timeout=100):
         selector.update_model(new_layer, 'inserted')
     assert selector.model().rowCount() == 3
@@ -350,6 +352,18 @@ def test_VP_update_options(plotter: VoxelPlotter):
     assert plotter.xscale == options_dict['xscale']
     assert plotter.mode == options_dict['mode']
     assert plotter.roi_mode == options_dict['roi_mode']
+
+def test_VP_data(plotter: VoxelPlotter):
+    plotter = plotter
+    viewer = plotter.viewer
+    cpos = (0, 0, 0, 0)
+
+    plotter.layers = [viewer.layers[1], viewer.layers[2]]
+    plotter.cursor_pos = np.array(cpos)
+    plotter.draw()
+
+    assert list(plotter.data.keys()) == [f'{viewer.layers[1].name}-{cpos[2:]}', f'{viewer.layers[2].name}-{cpos[1:]}']
+    assert np.array_equal(list(plotter.data.values()), [viewer.layers[1].data[(slice(None),) + cpos[2:]], viewer.layers[2].data[(slice(None),) + cpos[1:]]])
 
 
 def test_OptionsManager(qtbot: qtbot):
