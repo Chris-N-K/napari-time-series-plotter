@@ -192,6 +192,7 @@ class DataTableModel(QtCore.QAbstractTableModel):
         self._source = source
         self._data = None
     
+    # currently not necessary
     '''def setData(self, index: QtCore.QModelIndex | tuple, value: int | float, role: Qt.ItemDataRole = Qt.EditRole) -> bool:
         """Sets the role data for the item at index to value.
 
@@ -233,6 +234,7 @@ class DataTableModel(QtCore.QAbstractTableModel):
             return str(self._data.iloc[r, c])
         return QtCore.QVariant()
 
+    # currently not necessary
     '''def setHeaderData(self, section: int, orientation: Qt.Orientation, value: str, role: Qt.ItemDataRole = Qt.EditRole) -> bool:
         """Sets the data for the given role and section in the header with the specified orientation to the value supplied.
 
@@ -350,6 +352,9 @@ class DataTableModel(QtCore.QAbstractTableModel):
             col_idxs = slice(None)
         else:  # handle cell group selection
             cell_idxs = list(zip(*[(idx.row(), idx.column()) for idx in selectionModel.selectedIndexes()]))
-            row_idxs = slice(min(cell_idxs[0]), max(cell_idxs[0])+1)
-            col_idxs = slice(min(cell_idxs[1]), max(cell_idxs[1])+1)
+            if cell_idxs:
+                row_idxs = slice(min(cell_idxs[0]), max(cell_idxs[0])+1)
+                col_idxs = slice(min(cell_idxs[1]), max(cell_idxs[1])+1)
+            else:
+                return
         return row_idxs, col_idxs
