@@ -224,13 +224,13 @@ class DataTableModel(QtCore.QAbstractTableModel):
         :param role: ItemDataRole describing what to do; default: EditRole
         :return: value at given index
         """
-        if not index.isValid():
-            return None
         if role == Qt.DisplayRole:
             if isinstance(index, tuple):  # handle tuple index
                 r, c = index
-            else:  # handle QModelIndex
+            elif index.isValid():
                 r, c = index.row(), index.column()
+            else:
+                return QtCore.QVariant()
             return str(self._data.iloc[r, c])
         return QtCore.QVariant()
 
