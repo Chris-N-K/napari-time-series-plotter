@@ -5,12 +5,13 @@ import numpy as np
 from napari.layers import Image
 from pytestqt import qtbot
 from qtpy import QtWidgets
+from qtpy.QtCore import QItemSelectionModel, Signal, QObject
 
-from ..dock_widgets import TSPExplorer
+from ..dock_widgets import TSPExplorer, TSPInspector
 from ..widgets import LayerSelector, VoxelPlotter, OptionsManager
 
 
-def test_TSPExplorer_init(make_napari_viewer, qtbot: qtbot):
+def test_TSPExplorer_init(make_napari_viewer):
     viewer = make_napari_viewer(show=False)
     explorer = TSPExplorer(viewer)
 
@@ -32,7 +33,12 @@ def test_TSPExplorer_init(make_napari_viewer, qtbot: qtbot):
     selector = explorer.findChild(LayerSelector)
     assert selector
 
-def test_TSPExplorer_callbacks(make_napari_viewer, qtbot: qtbot):
+    # test datatable model
+    assert explorer.datatable
+
+    #TODO: add event tests
+
+def test_TSPExplorer_callbacks(make_napari_viewer):
     viewer = make_napari_viewer(show=False)
     explorer = TSPExplorer(viewer)
 
@@ -56,3 +62,40 @@ def test_TSPExplorer_callbacks(make_napari_viewer, qtbot: qtbot):
     viewer.add_image(np.random.randint(0, 100, (10, 10, 10)), name='3D')
     viewer.add_image(np.random.randint(0, 100, (10, 10, 10, 10)), name='4D')
     viewer.layers.remove('3D')
+
+
+def test_TSPInspector(make_napari_viewer, qtbot: qtbot, monkeypatch):
+    viewer = make_napari_viewer(show=False)
+    inspector = TSPInspector(viewer)
+    assert inspector.model
+
+    class MockModel(QObject):
+        called = Signal()
+
+        def __init__(self) -> None:
+            super().__init__()
+
+        def toClipboard(self, selection):
+            self.called.emit()
+        
+        def toCSV(self, path, selection):
+            self.called.emit()
+        
+        def update(self):
+            self.called.emit()
+
+    # monkeypatch the file dialog call in _exportToCSV
+    def mockreturn(a, b):
+        return '...', None
+    
+    monkeypatch.setattr(QtWidgets.QFileDialog, "getSaveFileName", mockreturn)
+
+    inspector.model = MockModel()
+    with qtbot.waitSignal(inspector.model.called, timeout=100):
+        inspector._toClipboard()
+    
+    with qtbot.waitSignal(inspector.model.called, timeout=100):
+        inspector._exportToCSV()
+
+    with qtbot.waitSignal(inspector.model.called, timeout=100):
+        inspector._updateData()
