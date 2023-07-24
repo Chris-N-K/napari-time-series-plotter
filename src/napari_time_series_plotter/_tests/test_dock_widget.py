@@ -6,7 +6,7 @@ from napari.layers import Image
 from pytestqt import qtbot
 from qtpy import QtWidgets
 
-from ..dock_widget import TSPExplorer
+from ..dock_widgets import TSPExplorer
 from ..widgets import LayerSelector, VoxelPlotter, OptionsManager
 
 

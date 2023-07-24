@@ -1,8 +1,10 @@
 import numpy as np
+import numpy.typing as npt
+import pandas as pd
 
 from qtpy import QtCore, QtGui
-from qtpy.QtCore import Qt
-from typing import Tuple, Union
+from qtpy.QtCore import Qt, QItemSelectionModel
+from typing import Any, List, Tuple
 
 __all__ = (
     'get_valid_image_layers',
@@ -10,7 +12,8 @@ __all__ = (
     'extract_voxel_time_series',
     'extract_ROI_time_series',
     'SelectorListItem',
-    'SelectorListModel'
+    'SelectorListModel',
+    'DataTableModel',
 )
 
 
@@ -173,3 +176,180 @@ class SelectorListModel(QtGui.QStandardItemModel):
         if len(matches) == 1:
             return matches[0]
         return matches
+
+
+class DataTableModel(QtCore.QAbstractTableModel):
+    """Subclass of QtCore.QAbstractTableModel.
+
+    This class stores the data extracted from selected layers in a two dimensional, table like format.
+    The stored data can be displayed with a QtWidget.QTableView widget.
+
+    Attributes:
+
+    """
+    def __init__(self, source, parent: QtCore.QObject = None) -> None:
+        super().__init__(parent)
+        self._source = source
+        self._data = None
+    
+    '''def setData(self, index: QtCore.QModelIndex | tuple, value: int | float, role: Qt.ItemDataRole = Qt.EditRole) -> bool:
+        """Sets the role data for the item at index to value.
+
+        Returns true if successful; otherwise returns false.
+        The dataChanged() signal should be emitted if the data was successfully set.
+        Can handle tuple style index and QModelIndex.
+
+        :param index: index to write at as tuple (row, col) or QModelIndex
+        :param value: value to write at the given index
+        :param role: ItemDataRole describing what to do; default: EditRole
+        :return: true if successful, otherwise returns false
+        """
+        if role == Qt.EditRole:
+            if isinstance(index, tuple):  # handle tuple index
+                r, c = index
+            else:  # handle QModelIndex
+                r, c = index.row(), index.column()
+            try:
+                self._data.iloc[r, c] = value
+                return True
+            except:
+                return False
+        return False'''
+
+    def data(self, index: QtCore.QModelIndex | tuple, role = Qt.DisplayRole) -> str | QtCore.QVariant:
+        """Returns the data stored under the given role for the item referred to by the index.
+        
+        :param index: index to write at as tuple (row, col) or QModelIndex
+        :param role: ItemDataRole describing what to do; default: EditRole
+        :return: value at given index
+        """
+        if not index.isValid():
+            return None
+        if role == Qt.DisplayRole:
+            if isinstance(index, tuple):  # handle tuple index
+                r, c = index
+            else:  # handle QModelIndex
+                r, c = index.row(), index.column()
+            return str(self._data.iloc[r, c])
+        return QtCore.QVariant()
+
+    '''def setHeaderData(self, section: int, orientation: Qt.Orientation, value: str, role: Qt.ItemDataRole = Qt.EditRole) -> bool:
+        """Sets the data for the given role and section in the header with the specified orientation to the value supplied.
+
+        Returns true if the header's data was updated; otherwise returns false.
+
+        :param section: section to write at
+        :param orientation: header orientation; horizontal -> col; vertical -> row
+        :param value: value to write at the given section
+        :param role: ItemDataRole describing what to do; default: EditRole
+        :return: true if successful, otherwise returns false
+        """
+        if role == Qt.EditRole:
+            if orientation == Qt.Horizontal:
+                try:
+                    self._data.rename(columns={self._data.columns[section], value})
+                    return True
+                except:
+                    return False
+            elif orientation == Qt.Vertical:
+                try:
+                    index = self._data.index
+                    index[section] = value
+                    self._data.set_index(index)
+                    return True
+                except:
+                    return False
+        return False'''
+            
+    def headerData(self, section: int, orientation: Qt.Orientation, role: Qt.ItemDataRole = Qt.DisplayRole) -> Any:
+        """Returns the data for the given role and section in the header with the specified orientation.
+
+        For horizontal headers, the section number corresponds to the column number. Similarly, for vertical headers, 
+        the section number corresponds to the row number.
+        
+        :param section: section to write at
+        :param orientation: header orientation; horizontal -> col; vertical -> row
+        :param role: ItemDataRole describing what to do; default: EditRole
+        :return: value at given section and orientation
+        """
+        if role == Qt.DisplayRole:
+            if orientation == Qt.Horizontal:
+                return str(self._data.columns[section])
+            elif orientation == Qt.Vertical:
+                return str(self._data.index[section])
+        return QtCore.QVariant()
+
+    def update(self):
+        """Update the underlying dataframe and emit a layoutChanged signal.
+        
+        :return: True if update was succesfull
+        """
+        try:
+            self._data = pd.DataFrame.from_dict(self._source.data)
+            self.layoutChanged.emit()
+        except:
+            return False
+        return True
+
+    def rowCount(self, index: QtCore.QModelIndex = ...) -> int:
+        """
+        Return row count.
+        """
+        try:
+            return len(self._data)
+        except:
+            return 0
+
+    def columnCount(self, index: QtCore.QModelIndex = ...) -> int:
+        """
+        Return column count.
+        """
+        try:
+            return len(self._data.columns)
+        except:
+            return 0
+
+    def toClipboard(self, selectionModel : QItemSelectionModel) -> None:
+        """Copy selected data to clipboard.
+        If selectionModel has no selection copy whole dataframe.
+
+        :param selectionModel: QItemSelectionModel of parent QTableView
+        """
+        idx = self._selection_to_pandas_iloc(selectionModel)
+        if idx:  # if selection, copy selected data
+            self._data.iloc[idx[0], idx[1]].to_clipboard()
+        else:  # if no selection, copy whole dataframe
+            self._data.to_clipboard()
+    
+    def toCSV(self, path : str, selectionModel : QItemSelectionModel) -> None:
+        """Copy selected data to clipboard.
+        If selectionModel has no selection save whole dataframe to path.
+
+        :param path: Save path
+        :param selectionModel: QItemSelectionModel of parent QTableView
+        """
+        idx = self._selection_to_pandas_iloc(selectionModel)
+        if idx:  # if selection, copy selected data
+            self._data.iloc[idx[0], idx[1]].to_csv(path)
+        else:  # if no selection, copy whole dataframe
+            self._data.to_csv(path)
+
+    @staticmethod
+    def _selection_to_pandas_iloc(selectionModel : QItemSelectionModel) -> Tuple[List[int] | slice, List[int] | slice]:
+        """Extract a selection from a QItemSelectionModel and convert to an index compatible with pandas DataFrame.iloc method.
+        
+        :param selectionModel: selection model of an QTableView
+        :return: pandas DataFrame.iloc compatiple index lists or slices, as tuple of lists of row indices and column indices
+        """
+        # translate selection into row and column indices
+        row_idxs = [idx.row() for idx in selectionModel.selectedRows()]
+        col_idxs = [idx.column() for idx in selectionModel.selectedColumns()]
+        if col_idxs and not row_idxs:  # handle whole column selections
+            row_idxs = slice(None)
+        elif row_idxs and not col_idxs:  # handle whole row selections
+            col_idxs = slice(None)
+        else:  # handle cell group selection
+            cell_idxs = list(zip(*[(idx.row(), idx.column()) for idx in selectionModel.selectedIndexes()]))
+            row_idxs = slice(min(cell_idxs[0]), max(cell_idxs[0])+1)
+            col_idxs = slice(min(cell_idxs[1]), max(cell_idxs[1])+1)
+        return row_idxs, col_idxs

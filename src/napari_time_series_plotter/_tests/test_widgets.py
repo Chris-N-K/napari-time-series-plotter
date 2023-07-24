@@ -151,16 +151,17 @@ def test_VP_draw(plotter: VoxelPlotter):
 
     # test data plot
     axes.clear()
-    plotter.cursor_pos = np.array([0, 0, 0])
+    cursor_pos = (0, 0, 0, 0)
+    plotter.cursor_pos = np.array(cursor_pos)
     plotter.draw()
     run_data_plot_tests(
         axes, 
-        'Cursor Position: [0 0 0]', 
+        '', 
         xlabel, 
         ylabel, 
         [
-            viewer.layers[1].name, 
-            viewer.layers[2].name
+            f'{viewer.layers[1].name}-{cursor_pos[-2:]}',
+            f'{viewer.layers[2].name}-{cursor_pos[-3:]}',
         ],
     )
 
@@ -179,8 +180,8 @@ def test_VP_draw(plotter: VoxelPlotter):
         xlabel, 
         ylabel, 
         [
-            viewer.layers[1].name, 
-            viewer.layers[2].name
+            f'{viewer.layers[1].name}-{cursor_pos[-2:]}',
+            f'{viewer.layers[2].name}-{cursor_pos[-3:]}',
         ],
     )
     plotter.title_text = None
@@ -201,7 +202,7 @@ def test_VP_draw(plotter: VoxelPlotter):
     plotter.draw()
     run_data_plot_tests(
         axes,
-        f'ROI {roi_mode} time series',
+        f'{roi_mode} ROI mode',
         xlabel,
         ylabel,
         [
@@ -215,7 +216,7 @@ def test_VP_draw(plotter: VoxelPlotter):
     plotter.roi_mode = roi_mode
     axes.clear()
     plotter.draw()
-    assert axes.get_title() == f'ROI {roi_mode} time series'
+    assert axes.get_title() == f'{roi_mode} ROI mode'
     # test shapes mode warning for translate
     viewer.layers['4D_image'].translate = [1,1,1,1]
     with pytest.warns(match='ROI plotting does not support layers with translate or scale values!\nSkiped layer: 4D_image'):
@@ -235,7 +236,7 @@ def test_VP_draw(plotter: VoxelPlotter):
     plotter.draw()
     run_data_plot_tests(
         axes,
-        'Voxel time series', 
+        'Points mode', 
         xlabel,
         ylabel,
         [

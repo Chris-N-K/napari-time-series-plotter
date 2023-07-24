@@ -1,3 +1,3 @@
-from .dock_widget import *
+from .dock_widgets import *
 from .widgets import *
 from .utils import *

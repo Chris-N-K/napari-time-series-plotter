@@ -124,7 +124,7 @@ class VoxelPlotter(NapariMPLWidget):
                     vidx, vts = extract_voxel_time_series(self.cursor_pos, layer, self.xscale)
                     # add graph
                     if not isinstance(vts, type(None)):
-                        handles.extend(self.axes.plot(vts[0], vts[1], label=lname))
+                        handles.extend(self.axes.plot(vts[0], vts[1], label=f'{lname}-{vidx[1:]}'))
 
                 # plot roi_mode value from square ROI(s) in shape layers
                 elif self.selection_layer and len(self.selection_layer.data) > 0:
@@ -160,14 +160,14 @@ class VoxelPlotter(NapariMPLWidget):
 
         if handles:
             title_dict = dict(
-                Voxel=f'Cursor Position: {self.cursor_pos}',
-                Shapes=f'ROI {self.roi_mode} time series',
-                Points='Voxel time series'
+                Voxel='',
+                Shapes=f'{self.roi_mode} ROI mode',
+                Points='Points mode'
             )
             if self.title_text:
                 self.axes.set_title(self.title_text)
-            else:
-                self.axes.set_title(title_dict[self.mode])
+            elif title_dict[self.mode]:
+                    self.axes.set_title(title_dict[self.mode])
             self.axes.tick_params(
                 axis='both',  # changes apply to both axes
                 which='both',  # both major and minor ticks are affected
@@ -183,7 +183,8 @@ class VoxelPlotter(NapariMPLWidget):
             if not self.autoscale:
                 self.axes.set_xlim(self.x_lim)
                 self.axes.set_ylim(self.y_lim)
-            self.axes.legend(loc=1)
+            self.axes.legend(loc='center left', bbox_to_anchor=(1, 0.3)).set_draggable(True)
+            self.canvas.figure.tight_layout()
         else:  # if there are no graphs to display show info text
             info_dict = dict(
                 Voxel='Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series.',
@@ -309,7 +310,17 @@ class VoxelPlotter(NapariMPLWidget):
             self.viewer.layers.remove(tmp)
             return True
         return False
+    
+    @property
+    def data(self):
+        """Get the currently plotted data.
 
+        Returns
+        ------
+        dict
+            Dictionary of plot labels as keys and lists of y data points as values.
+        """
+        return {plot.get_label(): plot.get_data()[1] for plot in self.axes.get_lines()}
 
 
 class OptionsManager(QtWidgets.QWidget):
