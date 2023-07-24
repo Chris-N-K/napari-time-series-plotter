@@ -1,9 +1,16 @@
 from napari.layers import Image, Labels
 import numpy as np
+import pandas as pd
 import pytest
-from qtpy.QtCore import Qt
 
+from pytestqt import qtbot
+from qtpy.QtCore import Qt, QModelIndex, QVariant, QItemSelectionModel
+from tempfile import TemporaryFile
+
+from ..widgets import VoxelPlotter
 from ..utils import *
+
+RANDOM_GENERATOR = np.random.default_rng(seed=121)
 
 
 # fixtures
@@ -19,6 +26,22 @@ def layer_list():
         Labels(data=larr, name='L3D'),
         Labels(data=np.expand_dims(larr, axis=0), name='L4D'),
     ]
+
+
+@pytest.fixture
+def source():
+    class SourceMock():
+        data = dict(
+            Img1_ROI0=RANDOM_GENERATOR.integers(0, 100, (10))
+        )
+    yield SourceMock()
+
+
+@pytest.fixture
+def dt_model(source):
+    dt_model = DataTableModel(source)
+    dt_model._data = pd.DataFrame(dict(t1=[1,2,3], t2=[4,5,6], t3=[7,8,9]))
+    return dt_model
 
 
 # tests
@@ -172,3 +195,63 @@ def test_SelectorListModel(layer_list):
     assert matches
     assert isinstance(matches, list)
     assert len(matches) == 2
+
+
+def test_DTM_update(source, qtbot):
+    dt_model = DataTableModel(source)
+    assert dt_model._data is None
+    with qtbot.waitSignal(dt_model.layoutChanged, timeout=100) as blocker:
+        assert dt_model.update()
+    assert np.array_equal(dt_model._data, pd.DataFrame.from_dict(source.data))
+
+
+def test_DTM_data(dt_model):
+    assert dt_model.data(QModelIndex()) is None
+    assert dt_model.data(dt_model.index(0,0), role=Qt.DisplayRole) == '1'
+    assert dt_model.data(dt_model.index(0,0), role=Qt.EditRole) == QVariant()
+
+
+def test_DTM_headerData(dt_model):
+    assert dt_model.headerData(0, Qt.Horizontal) == 't1'
+    assert dt_model.headerData(0, Qt.Vertical) == '0'
+    assert dt_model.headerData(0, Qt.Horizontal, role=Qt.EditRole) == QVariant()
+
+
+def test_DTM_rowCount(dt_model):
+    assert dt_model.rowCount() == 3
+
+
+def test_DTM_columnCount(dt_model):
+    assert dt_model.columnCount() == 3
+
+
+def test_DTM_selection_to_pandas_iloc(dt_model):
+    selection_model = QItemSelectionModel(dt_model)
+    idx = dt_model.index(0,0)
+    assert dt_model._selection_to_pandas_iloc(selection_model) is None
+
+    selection_model.select(idx, QItemSelectionModel.Select)
+    assert dt_model._selection_to_pandas_iloc(selection_model) == (slice(0,1), slice(0,1))
+
+    selection_model.select(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+    assert dt_model._selection_to_pandas_iloc(selection_model) == ([0], slice(None))
+
+    selection_model.select(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Columns)
+    assert dt_model._selection_to_pandas_iloc(selection_model) == (slice(None), [0])
+
+
+def test_DTM_toClipboard(dt_model):
+    selection_model = QItemSelectionModel(dt_model)
+    selection_model.select(dt_model.index(0,0), QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+
+    dt_model.toClipboard(selection_model)
+    assert pd.read_clipboard().compare(dt_model._data.loc[:0]).empty
+
+
+def test_DTM_toCSV(dt_model):
+    selection_model = QItemSelectionModel(dt_model)
+    selection_model.select(dt_model.index(0,0), QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+    tmp_file = '/home/cnk/Schreibtisch/test.csv'#TemporaryFile()
+
+    dt_model.toCSV(tmp_file, selection_model)
+    assert pd.read_csv(tmp_file, index_col=0).compare(dt_model._data.loc[:0]).empty
