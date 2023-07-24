@@ -206,7 +206,8 @@ def test_DTM_update(source, qtbot):
 
 
 def test_DTM_data(dt_model):
-    assert dt_model.data(QModelIndex()) is None
+    assert dt_model.data(QModelIndex()) == QVariant()
+    assert dt_model.data((0,0), role=Qt.DisplayRole) == '1'
     assert dt_model.data(dt_model.index(0,0), role=Qt.DisplayRole) == '1'
     assert dt_model.data(dt_model.index(0,0), role=Qt.EditRole) == QVariant()
 
@@ -242,16 +243,27 @@ def test_DTM_selection_to_pandas_iloc(dt_model):
 
 def test_DTM_toClipboard(dt_model):
     selection_model = QItemSelectionModel(dt_model)
-    selection_model.select(dt_model.index(0,0), QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
 
+    selection_model.select(dt_model.index(0,0), QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
     dt_model.toClipboard(selection_model)
     assert pd.read_clipboard().compare(dt_model._data.loc[:0]).empty
+
+    selection_model.select(QModelIndex(), QItemSelectionModel.Clear)
+    dt_model.toClipboard(selection_model)
+    assert pd.read_clipboard().compare(dt_model._data).empty
 
 
 def test_DTM_toCSV(dt_model):
     selection_model = QItemSelectionModel(dt_model)
-    selection_model.select(dt_model.index(0,0), QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
-    tmp_file = '/home/cnk/Schreibtisch/test.csv'#TemporaryFile()
 
-    dt_model.toCSV(tmp_file, selection_model)
-    assert pd.read_csv(tmp_file, index_col=0).compare(dt_model._data.loc[:0]).empty
+    with TemporaryFile() as file:
+        selection_model.select(dt_model.index(0,0), QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+        dt_model.toCSV(file, selection_model)
+        file.seek(0)
+        assert pd.read_csv(file, index_col=0).compare(dt_model._data.loc[:0]).empty
+
+    with TemporaryFile() as file:
+        selection_model.select(QModelIndex(), QItemSelectionModel.Clear)
+        dt_model.toCSV(file, selection_model)
+        file.seek(0)
+        assert pd.read_csv(file, index_col=0).compare(dt_model._data).empty
