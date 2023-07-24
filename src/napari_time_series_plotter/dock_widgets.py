@@ -134,8 +134,6 @@ class TSPInspector(QtWidgets.QWidget):
         # if user defines save path save and return True, else skip saving and return False
         if path:
             self.model.toCSV(path, self.tableview.selectionModel())
-            return True
-        return False
 
     def _updateData(self):
         self.model.update()
