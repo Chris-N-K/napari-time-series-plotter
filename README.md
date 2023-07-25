@@ -50,11 +50,9 @@ To install the latest development version install directly from the relevant Git
 ## Usage
 ### Basics and Live plotting
 
-<p align="center">
-  <img src="demo_videos/TSP_basic_and_voxel_plotting_demo.webm" alt="basic_demo" />
-</p>
+[![basic_demo](./demo_videos/TSP_basic_and_voxel_plotting_demo.jpg)](./demo_videos/TSP_basic_and_voxel_plotting_demo.webm)
     
-1. Select the TSPExplorer widget in the `Plugins` tab of the napari viewer
+1. Select the `TSPExplorer` widget in the `Plugins` tab of the napari viewer
 2. Use the `LayerSelector` to choose the image layers you want to source for plotting
 3. Move the corsor over the layer while holding "Shift"
 
@@ -68,29 +66,34 @@ The plot can be modified and saved through its toolbar above.
 
 ### Plotting ROIs
 
-<p align="center">
-  <img src="demo_videos/TSP_basic_and_voxel_plotting_demo.webm" alt="basic_demo" />
-</p>
+[![roi_demo](./demo_videos/TSP_ROI_plotting_demo.jpg)](./demo_videos//TSP_ROI_plotting_demo.webm)
 
 1. Select the Shapes plotting mode via the `Options` tab (Voxel mode is the default).
 2. Use the `LayerSelector` to choose the image layers you want to source for plotting.
 2. Add one ore more shapes to the "ROI Selection" layer.
-   The "ROI Selection" shapes are 2D only, effecting the currently displayed slice.
-   (newly added shapes might have to be moved before they are correctly plottet)
+   <br>The "ROI Selection" shapes are 2D only, effecting the currently displayed slice.
+   <br>(newly added shapes might have to be moved before they are correctly plottet)
 3. Reposition or remove shapes if needed.
 4. Change the ROI mode in the `Options` tab (Default: mean).
 
 ### Plotting multiple Points
 
-<p align="center">
-  <img src="demo_videos/TSP_Points_plotting_demo.webm" alt="basic_demo" />
-</p>
+[![points_demo](./demo_videos/TSP_Points_plotting_demo.jpg)](./demo_videos/TSP_Points_plotting_demo.webm)
 
 1. Select the Shapes plotting mode via the `Options` tab (Voxel mode is the default).
 2. Use the `LayerSelector` to choose the image layers you want to source for plotting.
 3. Add one or more points to the "Point selection" layer.
-   The points can be on different slices (3D and 4D support only) or images (grid mode)
+   <br>The points can be on different slices (3D and 4D support only) or images (grid mode)
 4. Reposition or remove points if needed.
+
+### View time series as table
+
+[![points_demo](./demo_videos/TSP_Inspector_demo.jpg)](./demo_videos/TSP_Inspector_demo.webm)
+
+1. Select the `TSPInspector` widget in the `Plugins` tab of the napari viewer
+2. Press the load from plot button to load the currently displayed plots into the `Inspector`
+
+You can copy the whole table or a selection to your clipboard or export it to CSV file through the buttons above.
 
 ## ToDo (help welcome)
 - [ ] Add Sphinx documentation
