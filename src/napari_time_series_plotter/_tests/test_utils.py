@@ -151,6 +151,17 @@ def test_extract_ROI_time_series(layer_list):
     assert not rts_4d
 
 
+def test_align_value_length():
+    d = dict(
+        a=[1.,2.],
+        b=[1.,2.,3.],
+        c=[1.,2.,3.,4.,5.,6.],
+        d=[1.,2.,3.]
+    )
+    aligned_d = align_value_length(d)
+    assert all([len(val) == 6 for val in aligned_d.values()])
+
+
 def test_SelectorListItem(layer_list):
     layer = layer_list[1]
     item = SelectorListItem(layer)
@@ -186,9 +197,11 @@ def test_SelectorListModel(layer_list):
     matches = model.get_item_idx_by_text('4D')
     assert matches
     assert isinstance(matches, int)
+
     # no match
     matches = model.get_item_idx_by_text('')
     assert not matches
+
     # double match
     items[0].setText('4D')
     matches = model.get_item_idx_by_text('4D')
@@ -199,10 +212,29 @@ def test_SelectorListModel(layer_list):
 
 def test_DTM_update(source, qtbot):
     dt_model = DataTableModel(source)
+
     assert dt_model._data is None
     with qtbot.waitSignal(dt_model.layoutChanged, timeout=100) as blocker:
         assert dt_model.update()
     assert np.array_equal(dt_model._data, pd.DataFrame.from_dict(source.data))
+
+
+def test_DTM_update_different_length(source, qtbot):
+    source.data['Img2_P1'] = RANDOM_GENERATOR.integers(0, 100, (15))
+    source_vals = [list(val) for val in source.data.values()]
+    ref_df = pd.DataFrame(
+        columns=source.data.keys(),
+        data=np.array([
+            source_vals[0] + [np.nan] * 5,
+            source_vals[1],
+        ]).T
+    )
+    dt_model = DataTableModel(source)
+
+    assert dt_model._data is None
+    with qtbot.waitSignal(dt_model.layoutChanged, timeout=100) as blocker:
+        assert dt_model.update()
+    assert np.array_equal(dt_model._data, ref_df, equal_nan=True)
 
 
 def test_DTM_data(dt_model):
@@ -219,10 +251,12 @@ def test_DTM_headerData(dt_model):
 
 
 def test_DTM_rowCount(dt_model):
+    assert dt_model.rowCount()
     assert dt_model.rowCount() == 3
 
 
 def test_DTM_columnCount(dt_model):
+    assert dt_model.columnCount()
     assert dt_model.columnCount() == 3
 
 

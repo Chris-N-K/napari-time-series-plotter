@@ -2,15 +2,17 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
+from numpy.typing import NDArray
 from qtpy import QtCore, QtGui
 from qtpy.QtCore import Qt, QItemSelectionModel
-from typing import Any, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 __all__ = (
     'get_valid_image_layers',
     'add_index_dim',
     'extract_voxel_time_series',
     'extract_ROI_time_series',
+    'align_value_length',
     'SelectorListItem',
     'SelectorListModel',
     'DataTableModel',
@@ -101,6 +103,21 @@ def extract_ROI_time_series(current_step, layer, labels, idx_shape, roi_mode, xs
     # extract mean and append to the list of ROIS
     if mask.any():
         return add_index_dim(mode_dict[roi_mode](layer.data[mask].reshape(dshape[0], -1), axis=1), xscale)
+
+
+def align_value_length(dictionary: Dict[Any, Iterable]) -> Dict[Any, NDArray]:
+    """Align the lengths of dictionary values by appending NaNs.
+    """
+    max_len = np.max([len(val) for val in dictionary.values()])
+    matched = {}
+    for key, val in dictionary.items():
+        if len(val) < max_len:
+            pval = np.full((max_len), np.nan)
+            pval[:len(val)] = val
+        else:
+            pval = val
+        matched[key] = pval
+    return matched
 
 
 # classes
@@ -286,8 +303,11 @@ class DataTableModel(QtCore.QAbstractTableModel):
         
         :return: True if update was succesfull
         """
+        # we need to bring all entries to the same length to support time series
+        # from different image layers
         try:
-            self._data = pd.DataFrame.from_dict(self._source.data)
+            data = align_value_length(self._source.data)
+            self._data = pd.DataFrame.from_dict(data)
             self.layoutChanged.emit()
         except:
             return False
