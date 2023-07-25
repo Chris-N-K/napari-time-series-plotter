@@ -5,7 +5,7 @@ import pandas as pd
 from numpy.typing import NDArray
 from qtpy import QtCore, QtGui
 from qtpy.QtCore import Qt, QItemSelectionModel
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple, Union
 
 __all__ = (
     'get_valid_image_layers',
@@ -210,7 +210,7 @@ class DataTableModel(QtCore.QAbstractTableModel):
         self._data = None
     
     # currently not necessary
-    '''def setData(self, index: QtCore.QModelIndex | tuple, value: int | float, role: Qt.ItemDataRole = Qt.EditRole) -> bool:
+    '''def setData(self, index: Union[QtCore.QModelIndex, tuple], value: Union[int, float], role: Qt.ItemDataRole = Qt.EditRole) -> bool:
         """Sets the role data for the item at index to value.
 
         Returns true if successful; otherwise returns false.
@@ -234,7 +234,7 @@ class DataTableModel(QtCore.QAbstractTableModel):
                 return False
         return False'''
 
-    def data(self, index: QtCore.QModelIndex | tuple, role = Qt.DisplayRole) -> str | QtCore.QVariant:
+    def data(self, index: Union[QtCore.QModelIndex, tuple], role = Qt.DisplayRole) -> Union[str, QtCore.QVariant]:
         """Returns the data stored under the given role for the item referred to by the index.
         
         :param index: index to write at as tuple (row, col) or QModelIndex
@@ -357,7 +357,7 @@ class DataTableModel(QtCore.QAbstractTableModel):
             self._data.to_csv(path)
 
     @staticmethod
-    def _selection_to_pandas_iloc(selectionModel : QItemSelectionModel) -> Tuple[List[int] | slice, List[int] | slice]:
+    def _selection_to_pandas_iloc(selectionModel : QItemSelectionModel) -> Tuple[Union[List[int], slice], Union[List[int], slice]]:
         """Extract a selection from a QItemSelectionModel and convert to an index compatible with pandas DataFrame.iloc method.
         
         :param selectionModel: selection model of an QTableView
