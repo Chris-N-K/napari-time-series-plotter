@@ -6,7 +6,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/conda-forge/napari-time-series-plotter/badges/version.svg)](https://anaconda.org/conda-forge/napari-time-series-plotter)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-time-series-plotter)](https://napari-hub.org/plugins/napari-time-series-plotter)
 [![tests](https://github.com/ch-n/napari-time_series_plotter/workflows/tests/badge.svg)](https://github.com/ch-n/napari-time_series_plotter/actions)
-[![codecov](https://codecov.io/gh/ch-n/napari-time_series_plotter/branch/main/graph/badge.svg)](https://codecov.io/gh/ch-n/napari-time_series_plotter)
+[![codecov](https://codecov.io/gh/Chris-N-K/napari-time_series_plotter/branch/main/graph/badge.svg?token=tv1tQj7JPH)](https://codecov.io/gh/Chris-N-K/napari-time_series_plotter)
 
 
 ## Description
