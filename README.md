@@ -12,15 +12,16 @@
 ## Description
 Napari-time_series_plotter (TSP) is a plugin for the `napari` ndimensional image viewer. 
 
-TSP adds live plotting of time-resolved images to napari. With the TSPExplorer widget, you can select and visualize pixel/voxel or ROI mean values from one or multiple image layers as intensity-over-time line plots. The first image dimension is handled as time. TSP supports 3D to nD images (3D: t+2D, nD: t+nD).
+**TSP** adds live plotting of time-resolved images to napari. You can select and visualize pixel/voxel or ROI mean values from one or multiple image layers as intensity-over-time line plots (The first image dimension is handled as time) and save the figures or the underlying time series data as CSV file. TSP supports 3D to nD images (3D: t+2D, nD: t+nD).
 
-The TSPExplorer offers three different plotting modes: Voxel, Shapes, Points
---> Voxel mode offers live plotting while moving the cursor over an image layer
---> Shapes mode offers shape-based ROI plotting the ROI combination method can be one of [Mean, Median, STD, Sum, Min, Max]; multiple ROIs can be plotted simultaneously
---> Points mode offers simultaneous, point-based plotting of multiple voxels
+**Plotting** is handeled by the `Explorer` widget, it offers three different plotting modes: Voxel, Shapes, Points
+<br>--> Voxel mode offers live plotting while moving the cursor over an image layer
+<br>--> Shapes mode offers shape-based ROI plotting the ROI combination method can be one of [Mean, Median, STD, Sum, Min, Max]; multiple ROIs can be plotted simultaneously
+<br>--> Points mode offers simultaneous, point-based plotting of multiple voxels
+<br>You can modify and save the plots through the canvas toolbar.
+<br>Plotting powered by `napari-matplotlib`.
 
-You can modify and save the plots through the canvas toolbar.
-Plotting powered by `napari-matplotlib`.
+**Viewing** the time series as a table is handled by the `Inspector` widget. You can load the data you've plotted and inspect the single time point values of each selection. The columns are named like the plots in the `Explorer`. You can copy the whole tabe or a selection to the clipboard or directly expot it to a CSV file to save the time series.
 
 ----------------------------------
 
@@ -47,36 +48,49 @@ Alternatively, you can install the plugin directly in the `napari` viewer plugin
 To install the latest development version install directly from the relevant GitHub branch.
 
 ## Usage
+### Basics and Live plotting
+
 <p align="center">
-  <img src="https://github.com/ch-n/napari-time_series_plotter/raw/main/napari-time-series-plotter_demo.gif" alt="Demo gif" />
+  <img src="demo_videos/TSP_basic_and_voxel_plotting_demo.webm" alt="basic_demo" />
 </p>
     
-- Select the TSPExplorer widget in the `Plugins` tab of the napari viewer
-- Use the LayerSelector to choose the image layers you want to source for plotting
-- Select the plotting mode via the options tab (Voxel mode is the default)
+1. Select the TSPExplorer widget in the `Plugins` tab of the napari viewer
+2. Use the `LayerSelector` to choose the image layers you want to source for plotting
+3. Move the corsor over the layer while holding "Shift"
 
-Voxel mode:
-- Move the mouse over the image while holding "Shift"
-- The plotter will display the hovered voxel intensity over time for all selected layers
-
-Shapes mode:
-- Add one or more shapes to the ROI selection layer
-- Position it as you need
-- The plotter will display the combined intensity of the ROI over time for all selected layers
-    - The shapes are 2D only; 3D ROIs are not supported
-    - All shapes are on the currently displayed slice
-    - The ROI combination mode can be selected in the options tab, default: mean
-
-Points mode:
-- Add one or more points to the Point selection layer
-- The plotter will display a time series plot for each point on all selected layers
-    - The points can be on different slices (3D and 4D support only) or images (grid mode)
-    - Adding or moving points will regenerate the plots
-
-- Set custom title or axe labels in the options tab
-- Switch between autoscaling and manually defined max and min values of the axes in the options tab
+The `Options` tab offers multiple options to customize your plot. 
+- Set custom title or axe labels
+- Switch between autoscaling and manually defined max and min values of the axes
 - Switch to label truncation in the options tab if your layer names are too long for the figure legend (set max length manually)
-- Set a scaling factor for the X-axis in the options tab
+- Set a scaling factor for the X-axis
+
+The plot can be modified and saved through its toolbar above.
+
+### Plotting ROIs
+
+<p align="center">
+  <img src="demo_videos/TSP_basic_and_voxel_plotting_demo.webm" alt="basic_demo" />
+</p>
+
+1. Select the Shapes plotting mode via the `Options` tab (Voxel mode is the default).
+2. Use the `LayerSelector` to choose the image layers you want to source for plotting.
+2. Add one ore more shapes to the "ROI Selection" layer.
+   The "ROI Selection" shapes are 2D only, effecting the currently displayed slice.
+   (newly added shapes might have to be moved before they are correctly plottet)
+3. Reposition or remove shapes if needed.
+4. Change the ROI mode in the `Options` tab (Default: mean).
+
+### Plotting multiple Points
+
+<p align="center">
+  <img src="demo_videos/TSP_Points_plotting_demo.webm" alt="basic_demo" />
+</p>
+
+1. Select the Shapes plotting mode via the `Options` tab (Voxel mode is the default).
+2. Use the `LayerSelector` to choose the image layers you want to source for plotting.
+3. Add one or more points to the "Point selection" layer.
+   The points can be on different slices (3D and 4D support only) or images (grid mode)
+4. Reposition or remove points if needed.
 
 ## ToDo (help welcome)
 - [ ] Add Sphinx documentation
@@ -84,8 +98,9 @@ Points mode:
 ## Version 0.1.0 Milestones
 - [X] Update to napari-plugin-engine2 [#5](https://github.com/ch-n/napari-time_series_plotter/issues/5)
 - [X] Update widget GUI [#6](https://github.com/ch-n/napari-time_series_plotter/issues/6)
-- [ ] Add widget to save pixel/voxel time series to file [#7](https://github.com/ch-n/napari-time_series_plotter/issues/7)
+- [x] Add widget to save pixel/voxel time series to file [#7](https://github.com/ch-n/napari-time_series_plotter/issues/7)
 - [X] Add ROI and multi-voxel plotting [#14](https://github.com/ch-n/napari-time_series_plotter/issues/14)
+- [ ] Evaluate and close remaining issues ([#22](https://github.com/ch-n/napari-time_series_plotter/issues/22), [#25](https://github.com/ch-n/napari-time_series_plotter/issues/25),)
 
 ## Contributing
 
