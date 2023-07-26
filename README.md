@@ -50,7 +50,7 @@ To install the latest development version install directly from the relevant Git
 ## Usage
 ### Basics and Live plotting
 
-[![basic_demo](./demo_videos/TSP_basic_and_voxel_plotting_demo.jpg)](./demo_videos/TSP_basic_and_voxel_plotting_demo.webm)
+[TSP_basic_and_voxel_plotting_demo.webm](https://github.com/Chris-N-K/napari-time_series_plotter/assets/56394171/89b12967-5cef-4645-9b68-1a13ea740be5)
     
 1. Select the `TSPExplorer` widget in the `Plugins` tab of the napari viewer
 2. Use the `LayerSelector` to choose the image layers you want to source for plotting
@@ -66,7 +66,7 @@ The plot can be modified and saved through its toolbar above.
 
 ### Plotting ROIs
 
-[![roi_demo](./demo_videos/TSP_ROI_plotting_demo.jpg)](./demo_videos//TSP_ROI_plotting_demo.webm)
+[TSP_ROI_plotting_demo.webm](https://github.com/Chris-N-K/napari-time_series_plotter/assets/56394171/b4ce7e20-21d8-407c-8b3b-739a9385350d)
 
 1. Select the Shapes plotting mode via the `Options` tab (Voxel mode is the default).
 2. Use the `LayerSelector` to choose the image layers you want to source for plotting.
@@ -78,7 +78,7 @@ The plot can be modified and saved through its toolbar above.
 
 ### Plotting multiple Points
 
-[![points_demo](./demo_videos/TSP_Points_plotting_demo.jpg)](./demo_videos/TSP_Points_plotting_demo.webm)
+[TSP_Points_plotting_demo.webm](https://github.com/Chris-N-K/napari-time_series_plotter/assets/56394171/a4f5ede5-8146-40a6-9629-c737aad2daef)
 
 1. Select the Shapes plotting mode via the `Options` tab (Voxel mode is the default).
 2. Use the `LayerSelector` to choose the image layers you want to source for plotting.
@@ -88,7 +88,7 @@ The plot can be modified and saved through its toolbar above.
 
 ### View time series as table
 
-[![points_demo](./demo_videos/TSP_Inspector_demo.jpg)](./demo_videos/TSP_Inspector_demo.webm)
+[TSP_Inspector_demo.webm](https://github.com/Chris-N-K/napari-time_series_plotter/assets/56394171/f5a2e7fc-0d33-4f70-a2e9-2bbf959354c6)
 
 1. Select the `TSPInspector` widget in the `Plugins` tab of the napari viewer
 2. Press the load from plot button to load the currently displayed plots into the `Inspector`
