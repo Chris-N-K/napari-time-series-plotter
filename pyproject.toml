@@ -55,9 +55,3 @@ exclude = [
 
 target-version = "py38"
 fix = true
-
-[tool.mypy]
-exclude = "docs/source/conf.py"
-ignore_missing_imports = true
-show_error_codes = true
-warn_redundant_casts = true
