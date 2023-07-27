@@ -57,4 +57,8 @@ target-version = "py38"
 fix = true
 
 [tool.mypy]
-exclude = "docs/"
+exclude = "docs/source/conf.py"
+plugins =  "numpy.typing.mypy_plugin, pydantic.mypy"
+ignore_missing_imports = true
+show_error_codes = true
+warn_redundant_casts = true
