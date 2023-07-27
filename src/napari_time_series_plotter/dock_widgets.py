@@ -14,12 +14,12 @@ see: https://napari.org/docs/dev/plugins/hook_specifications.html
 """
 import typing
 
-from qtpy import QtWidgets, QtCore
+from qtpy import QtCore, QtWidgets
 
-from .widgets import *
-from .utils import DataTableModel
+from .models import TimeSeriesTableModel
+from .widgets import LayerSelector, OptionsManager, VoxelPlotter
 
-__all__ = ('TSPExplorer', 'TSPInspector')
+__all__ = ("TSPExplorer", "TSPInspector")
 
 # TODO: TSPExplorer besseren namen finden
 class TSPExplorer(QtWidgets.QWidget):
@@ -33,7 +33,10 @@ class TSPExplorer(QtWidgets.QWidget):
         selector : napari_time_series_plotter.LayerSelector
         plotter : napari_time_series_plotter.VoxelPlotter
     """
-    def __init__(self, napari_viewer, parent: typing.Optional[QtWidgets.QWidget] = None) -> None:
+
+    def __init__(
+        self, napari_viewer, parent: typing.Optional[QtWidgets.QWidget] = None
+    ) -> None:
         super().__init__(parent)
         self.viewer = napari_viewer
 
@@ -41,36 +44,45 @@ class TSPExplorer(QtWidgets.QWidget):
         self.tabs = QtWidgets.QTabWidget()
         self.selector = LayerSelector(self.viewer)
         self.options = OptionsManager()
-        self.plotter = VoxelPlotter(self.viewer, self.selector, self.options.plotter_options())
-        self.tabs.addTab(self.plotter, 'Plotter')
-        self.tabs.addTab(self.options, 'Options')
+        self.plotter = VoxelPlotter(
+            self.viewer, self.selector, self.options.plotter_options()
+        )
+        self.tabs.addTab(self.plotter, "Plotter")
+        self.tabs.addTab(self.options, "Options")
 
         # data models
-        self.datatable = DataTableModel(self.plotter)
+        self.datatable = TimeSeriesTableModel(self.plotter)
 
         # layout
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.tabs)
-        layout.addWidget(QtWidgets.QLabel('Layer Selector'))
+        layout.addWidget(QtWidgets.QLabel("Layer Selector"))
         layout.addWidget(self.selector)
         self.setLayout(layout)
 
         # handle events
-        self.viewer.layers.events.inserted.connect(self._layer_list_changed_callback)
-        self.viewer.layers.events.removed.connect(self._layer_list_changed_callback)
+        self.viewer.layers.events.inserted.connect(
+            self._layer_list_changed_callback
+        )
+        self.viewer.layers.events.removed.connect(
+            self._layer_list_changed_callback
+        )
         self.selector.model().itemChanged.connect(self.plotter.update_layers)
-        self.options.plotter_option_changed.connect(self.plotter.update_options)
+        self.options.plotter_option_changed.connect(
+            self.plotter.update_options
+        )
 
     def _layer_list_changed_callback(self, event):
         """Callback function for layer list changes.
 
         Update the selector model on each layer list change to insert or remove items accordingly.
         """
-        if event.type in ['inserted', 'removed', 'reordered']:
+        if event.type in ["inserted", "removed", "reordered"]:
             value = event.value
             etype = event.type
-            if value._type_string == 'image' and value.ndim in [3, 4]:
+            if value._type_string == "image" and value.ndim in [3, 4]:
                 self.selector.update_model(value, etype)
+
 
 # TODO: TSPInspector besseren namen finden
 class TSPInspector(QtWidgets.QWidget):
@@ -84,27 +96,32 @@ class TSPInspector(QtWidgets.QWidget):
         table_view : Qt QTableView widget for data visualization
         model : TSP DataTableModel object for storage of the active time series
     """
+
     dataChanged = QtCore.Signal()
 
-    def __init__(self, napari_viewer, parent: typing.Optional[QtWidgets.QWidget] = None) -> None:
+    def __init__(
+        self, napari_viewer, parent: typing.Optional[QtWidgets.QWidget] = None
+    ) -> None:
         super().__init__(parent)
         self.viewer = napari_viewer
 
         # access main widget, initialize if not already docked
-        tspe_dock, tspe_widget = self.viewer.window.add_plugin_dock_widget('napari-time-series-plotter', 'Explorer')
+        tspe_dock, tspe_widget = self.viewer.window.add_plugin_dock_widget(
+            "napari-time-series-plotter", "Explorer"
+        )
         tspe_dock.setHidden(False)
         self.model = tspe_widget.datatable
         self.model.dataChanged.connect(self.dataChanged.emit)
 
         # subwidgets
         self.load_btn = QtWidgets.QPushButton()
-        self.load_btn.setText('Load from plot')
+        self.load_btn.setText("Load from plot")
         self.load_btn.clicked.connect(self._updateData)
         self.copy_btn = QtWidgets.QPushButton()
-        self.copy_btn.setText('Selection to Clipboard')
+        self.copy_btn.setText("Selection to Clipboard")
         self.copy_btn.clicked.connect(self._toClipboard)
         self.export_btn = QtWidgets.QPushButton()
-        self.export_btn.setText('Selection to CSV file')
+        self.export_btn.setText("Selection to CSV file")
         self.export_btn.clicked.connect(self._exportToCSV)
         self.tableview = QtWidgets.QTableView()
         self.tableview.setModel(self.model)
@@ -130,7 +147,7 @@ class TSPInspector(QtWidgets.QWidget):
         """
         Private, execute the models toCSV method.
         """
-        path, filter = QtWidgets.QFileDialog.getSaveFileName(self, 'Save File')
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save File")
         # if user defines save path save and return True, else skip saving and return False
         if path:
             self.model.toCSV(path, self.tableview.selectionModel())
