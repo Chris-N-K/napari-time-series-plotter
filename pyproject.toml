@@ -57,4 +57,4 @@ target-version = "py38"
 fix = true
 
 [tool.mypy]
-files = "src/napari_time_series_plotter"
+packages = "src/napari_time_series_plotter"
