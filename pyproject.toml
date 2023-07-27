@@ -50,6 +50,7 @@ exclude = [
     "venv",
     "*vendored*",
     "*_vendor*",
+    "docs",
 ]
 
 target-version = "py38"
