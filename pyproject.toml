@@ -55,3 +55,6 @@ exclude = [
 
 target-version = "py38"
 fix = true
+
+[tool.mypy]
+exclude = "docs"
