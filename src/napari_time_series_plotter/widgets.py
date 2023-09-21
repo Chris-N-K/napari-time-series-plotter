@@ -76,6 +76,7 @@ class VoxelPlotter(NapariMPLWidget):
     """
     def __init__(self, napari_viewer, selector, options=None):
         super().__init__(napari_viewer)
+        self.layers_checked = None
         self.selector = selector
         self.cursor_pos = np.array([])
         self.selection_layer = None
@@ -110,8 +111,8 @@ class VoxelPlotter(NapariMPLWidget):
         """
         handles = []
 
-        if self.layers:
-            for layer in self.layers:
+        if self.layers_checked:
+            for layer in self.layers_checked:
                 # get layer data
                 if self.max_label_len:
                     lname = layer.name[slice(self.max_label_len)]
@@ -213,7 +214,7 @@ class VoxelPlotter(NapariMPLWidget):
         """
         Overwrite the layers attribute with the currently checked items in the selector model and re-draw.
         """
-        self.layers = self.selector.model().get_checked()
+        self.layers_checked = self.selector.model().get_checked()
         self._draw()
 
     def update_options(self, options_dict: dict):
@@ -281,7 +282,7 @@ class VoxelPlotter(NapariMPLWidget):
         If event contains 'Shift' and layer attribute contains napari layers the cursor position is written to the
         cursor_pos attribute and the _draw method is called afterwards.
         """
-        if 'Shift' in event.modifiers and self.layers:
+        if 'Shift' in event.modifiers and self.layers_checked:
             self.cursor_pos = np.round(viewer.cursor.position)
             self._draw()
 
