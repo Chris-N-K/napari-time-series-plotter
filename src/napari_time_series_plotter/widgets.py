@@ -27,7 +27,7 @@ class LayerSelector(QtWidgets.QTreeView):
 
     def __init__(self, napari_viewer, parent=None):
         super().__init__(parent)
-        self.setObjectName("LayerSlector")
+        self.setObjectName("LayerSelector")
         self.setModel(LayerSelectionModel(napari_viewer.layers))
         self.setHeaderHidden(True)
         self.setFixedHeight(100)
