@@ -128,7 +128,6 @@ class LayerSelectionItem(QtGui.QStandardItem):
         return False
 
 
-# TODO: should use the specific classes for the source and selection layers
 class LayerSelectionModel(QtGui.QStandardItemModel):
     """Subclass of QtGui.QStandardItemModel.
 
