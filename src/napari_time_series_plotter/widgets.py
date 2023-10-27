@@ -2,19 +2,18 @@ from warnings import warn
 
 import numpy as np
 from napari_matplotlib.base import NapariMPLWidget
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtWidgets
 
-from .models import SelectionModel, SourceLayerItem
+from .models import LayerSelectionModel
 from .utils import (
     extract_ROI_time_series,
     extract_voxel_time_series,
-    get_valid_image_layers,
 )
 
 __all__ = ("LayerSelector", "VoxelPlotter", "OptionsManager")
 
 
-class LayerSelector(QtWidgets.QListView):
+class LayerSelector(QtWidgets.QTreeView):
     """Subclass of QListView for selection of 3D/4D napari image layers.
 
     This widget contains a list of all 4D images layer currently in the napari viewer layers list. All items have a
@@ -28,39 +27,14 @@ class LayerSelector(QtWidgets.QListView):
 
     def __init__(self, napari_viewer, parent=None):
         super().__init__(parent)
-        self.napari_viewer = napari_viewer
-        self.model = SelectionModel()
-        self.setModel(self.model)
-        self.update_model(None, None)
-
-    def update_model(self, layer, action):
-        """
-        Update the underlying model data (clear and rewrite) and emit an itemChanged event.
-        The size of the widget is adjusted to the number of items displayed.
-
-        :param layer: changed layer (inserted or removed from layer list)
-        :param action: type of change (inserted / removed) -> add or remove item to model
-        """
-        if layer:
-            if action == "inserted":  # add layer to model
-                item = SourceLayerItem(layer)
-                self.model().insertRow(0, item)
-            elif action == "removed":  # remove layer from model
-                item_idx = self.model().get_item_idx_by_text(layer.name)
-                self.model().removeRow(item_idx)
-            elif action == "reordered":
-                pass  # TODO:  reordering callback not implemented yet
-        else:  # if no layer was given generate completely new model
-            self.model().clear()
-            for layer in get_valid_image_layers(self.napari_viewer.layers):
-                item = SourceLayerItem(layer)
-                self.model().insertRow(0, item)
-        # match widget size to item count
-        self.setMaximumHeight(
-            self.sizeHintForRow(0) * self.model().rowCount()
-            + 2 * self.frameWidth()
+        self.setObjectName("LayerSlector")
+        self.setModel(LayerSelectionModel(napari_viewer.layers))
+        self.setHeaderHidden(True)
+        self.setFixedHeight(100)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred
         )
-        self.model().itemChanged.emit(QtGui.QStandardItem())
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
 
 class VoxelPlotter(NapariMPLWidget):
@@ -257,7 +231,7 @@ class VoxelPlotter(NapariMPLWidget):
         """
         Overwrite the layers attribute with the currently checked items in the selector model and re-draw.
         """
-        self.layers = self.selector.model().get_checked()
+        self.layers = self.selector.model().checkedItems()
         self._draw()
 
     def update_options(self, options_dict: dict):

@@ -8,62 +8,57 @@ from typing import (
 
 import napari
 import pandas as pd
-from napari.layers import (
-    Image,
-    Layer,
-    Points,
-    Shapes,
+from napari_matplotlib.base import NapariMPLWidget
+from qtpy import (
+    QtCore,
+    QtGui,
+    QtWidgets,
 )
-from qtpy.QtCore import (
-    QAbstractTableModel,
-    QItemSelectionModel,
-    QModelIndex,
-    QObject,
-    Qt,
-    QVariant,
-    Slot,
-)
-from qtpy.QtGui import (
-    QIcon,
-    QStandardItem,
-    QStandardItemModel,
-)
+from qtpy.QtCore import Qt
 
 from .utils import align_value_length
-from .widgets import VoxelPlotter
 
-__all__ = ("SourceLayerItem", "SelectionModel", "TimeSeriesTableModel")
+__all__ = ("LayerSelectionItem", "LayerSelectionModel", "TimeSeriesTableModel")
 
 
-# TODO: make this the base class
-class BaseSelectionItem(QStandardItem):
-    """Subclass of QtGui.QStandardItem.
-
-    Base item class for the SelectionModel. This class should not be used by itself,
-    but should be subclassed. If sulbclassing please reimplement the type() method to
-    return qtpy.QtGui.QStandardItem.UserType + x with x > 2
-    This item is checkable and holds a refference to its parent napari layer. The text
-    of the item is bound to the layer name and updates with it.
+class LayerSelectionItem(QtGui.QStandardItem):
+    """Item class for LayerSelectionModel.
+    This item is checkable and holds a refference to its parent napari layer.
+    The displayable text of the item is bound to the parent layer name and updates
+    with it. Additionally, the item can hold time series data extracted from the
+    parent layer.
 
     Parameters
     ----------
-    layer : napari.layers.Layer
+    _layer : napari.layers.Layer
         Parent napari layer.
+    _tsdata : List[Union[int, float]]
+        Time series data extracted from the parent layer.
 
     Methods
     -------
     data(role=Qt.ItemDataRole)
         Overload of the QStandardItem.data() method. The method adds functionality
         for the Qt.DisplayRole to display the name of the connected napari layer.
-
+    flags()
+        Return item flags.
+    type()
+        Return item type.
     layer()
         Return parent napari layer.
+    children()
+        Return all child items.
+    findChildren(data=Any, role=Optional[Qt.ItemDataRole])
+        Return list of indices, of child items containin matching data for the given
+        role.
     """
 
-    def __init__(self, *args, layer: Layer, **kwargs) -> None:
+    def __init__(self, layer: Any, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._layer = layer
-        icon = QIcon()
+        self._tsdata: List[Union[float, int]] = []
+
+        icon = QtGui.QIcon()
         icon.addFile(
             f"{napari.utils._appdirs.user_cache_dir()}/_themes/{napari.current_viewer().theme}/new_{self._layer._type_string}.svg"
         )
@@ -71,105 +66,69 @@ class BaseSelectionItem(QStandardItem):
         self.setEditable(False)
         self.setCheckable(True)
 
-    def data(self, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole) -> str:
+    def data(self, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole) -> object:
         """
         Return the data stored under role.
         """
         if role == Qt.DisplayRole:
             return self._layer.name
-        if role == Qt.ItemDataRole.UserRole + 1:
+        if role == Qt.UserRole + 1:
             return self._layer._type_string
+        if role == Qt.UserRole + 2:
+            return str(self._tsdata)
         return super().data(role)
 
-    def layer(self) -> Layer:
+    def flags(self) -> Qt.ItemFlags:
+        """
+        Return item flags.
+        """
+        item_flags = (
+            super().flags()
+            & ~Qt.ItemIsEditable
+            & ~Qt.ItemIsDragEnabled
+            & ~Qt.ItemIsDropEnabled
+        )
+        if self._layer._type_string != "image":
+            return item_flags & Qt.ItemNeverHasChildren
+        return item_flags
+
+    def type(self) -> int:
+        """
+        Return item type.
+        """
+        return QtGui.QStandardItem.UserType + 1
+
+    def layer(self):
         """
         Return the parent napari layer.
         """
         return self._layer
 
-
-class SourceLayerItem(BaseSelectionItem):
-    """Subclass of BaseSelectionItem.
-
-    Top level item for a SelectionModel, it is connected to a source layer (Image
-    layer) in a napari Viewer instance. A SourceLayerItem instance can have multiple
-    child items (SelectionLayerItem).
-
-    Parameters
-    ----------
-    layer : napari.layers.Image
-        Parent napari layer; must be of type napari.layers.Image.
-    """
-
-    def __init__(self, *args, layer: Image, **kwargs) -> None:
-        if isinstance(layer, Image):
-            raise ValueError(
-                "Parameter layer ust be of type napari.layers.Points or napari.layers.Shapes"
-            )
-        super().__init__(*args, layer, **kwargs)
-
-    def type(self) -> int:
+    def children(self) -> list:
         """
-        Return item type.
+        Return all child items.
         """
-        return QStandardItem.UserType + 1
+        return [
+            self.child(row, column)
+            for column in range(self.columnCount())
+            for row in range(self.rowCount())
+        ]
 
-    def flags(self) -> Qt.ItemFlags:
+    def findChildren(
+        self, data: Any, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole
+    ) -> List[QtCore.QModelIndex]:
         """
-        Retrun item flags.
+        Return list of indices, of child items containin matching data for the given role.
         """
-        return super().flags() & ~Qt.ItemIsEditable
-
-
-class SelectionLayerItem(QStandardItem):
-    """Subclass of BaseSelectionItem.
-
-    Second level item for a SelectionModel, it is connected to a selection layer
-    (Points / Shapes layer) in a napari Viewer instance. A SelectionLayerItem
-    instance should be the child of a SourceLayerItem.
-
-    Parameters
-    ----------
-    layer : napari.layers.Image
-        Parent napari layer; must be of type napari.layers.Points or napari.layers.Shapes.
-
-    Methods
-    -------
-    data(role=Qt.ItemDataRole)
-        Overload of the QStandardItem.data() method. The method adds functionality
-        for the Qt.DisplayRole to display the name of the connected napari layer.
-    type()
-        Return custom type code.
-    """
-
-    def __init__(self, *args, layer: Union[Points, Shapes], **kwargs) -> None:
-        if isinstance(layer, Points) ^ isinstance(layer, Shapes):
-            raise ValueError(
-                "Parameter layer ust be of type napari.layers.Points or napari.layers.Shapes"
-            )
-        super().__init__(*args, layer, **kwargs)
-
-    def type(self) -> int:
-        """
-        Return item type.
-        """
-        return QStandardItem.UserType + 2
-
-    def flags(self) -> Qt.ItemFlags:
-        """
-        Retrun item flags.
-        """
-        return (
-            super().flags()
-            & ~Qt.ItemIsEditable
-            & ~Qt.ItemIsDragEnabled
-            & ~Qt.ItemIsDropEnabled
-            & Qt.ItemNeverHasChildren
-        )
+        return [
+            child.index()
+            for child in self.children()
+            if child.data(role) == data
+        ]
 
 
 # TODO: should use the specific classes for the source and selection layers
-class SelectionModel(QStandardItemModel):
+class LayerSelectionModel(QtGui.QStandardItemModel):
     """Subclass of QtGui.QStandardItemModel.
 
     This class can hold QtGui.QStandardItems and derived subclasses and can be used
@@ -177,30 +136,23 @@ class SelectionModel(QStandardItemModel):
 
     Attributes
     ----------
-    layer_list : napari.components.layerlist.LayerList
-        Active napari viewer layer list (viewer.layers)
-    checkedItems : list
-        List of all items with the check state QtCore.Qt.Checked and
-        their repective children with the same check state.
-
+    _layer_list : napari.components.layerlist.LayerList
+        Napari LayerList containing the layers of the napari main viewer.
 
     Methods
     -------
-    _setup_callbacks()
-
-    _layer_event_callback()
-
     update()
-        Update all model items.
-    get_checked()
-        Return the layers of all items with the check state QtCore.Qt.Checked and
-        their repective children with the same check state.
-    get_item_idx_by_text(search_text=str)
-        Returns all items which text attribute matches search_text.
+
+    checkedItems()
+
+    indexFromText()
+
     """
 
     def __init__(
-        self, layer_list: napari.components.layerlist.LayerList
+        self,
+        layer_list: napari.components.layerlist.LayerList,
+        parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """
         Parameters
@@ -208,49 +160,81 @@ class SelectionModel(QStandardItemModel):
         layer_list : napari.components.layerlist.LayerList
             Napari LayerList containing the layers of the napari main viewer.
         """
-        super().__init__()
+        super().__init__(parent)
         self._layer_list = layer_list
 
-        self._setup_callbacks()
-        self.update()
+        self.update(layer_list)
+        layer_list.events.connect(
+            lambda event: self.dataChanged.emit(
+                QtCore.QModelIndex(), QtCore.QModelIndex()
+            )
+            if event.type == "name"
+            else None
+        )
+        layer_list.events.inserted.connect(self._layer_inserted_callback)
+        layer_list.events.removed.connect(self._layer_removed_callback)
 
-    def _setup_callbacks(self) -> None:
-        self._layer_list.events.connect(self._layer_event_callback)
+    def _layer_inserted_callback(self, event: napari.utils.events.Event):
+        layer = event.value
+        if layer._type_string == "image" and layer.ndim > 2 and not layer.rgb:
+            item = LayerSelectionItem(layer)
+            child_items = [
+                LayerSelectionItem(layer)
+                for layer in self._layer_list
+                if layer._type_string in ["points", "shapes"]
+            ]
+            item.insertColumn(0, child_items)
+            self.insertRow(0, item)
+        elif layer._type_string in ["points", "shapes"]:
+            for row in range(self.rowCount()):
+                self.item(row, 0).insertRow(0, LayerSelectionItem(layer))
 
-    @Slot(napari.utils.events.Event)
-    def _layer_event_callback(self, event: napari.utils.events.Event) -> None:
-        if event.type == "name":
-            self.dataChanged.emit(QModelIndex(), QModelIndex())
-        elif event.type in ["inserted", "removed"]:
-            self.update()
+    def _layer_removed_callback(self, event: napari.utils.events.Event):
+        layer = event.value
+        if layer._type_string == "image":
+            self.removeRow(self.findItems(layer.name)[0].index().row())
+        elif layer._type_string in ["points", "shapes"]:
+            for row in range(self.rowCount()):
+                item = self.item(row, 0)
+                if item.hasChildren():
+                    rows = [
+                        idx.row()
+                        for idx in item.childIndexFromData(layer.name)
+                    ]
+                    item.removeRows(rows)
 
-    def update(self) -> None:
+    def update(self, layer_list) -> None:
         """Update all model items.
 
         The model is cleared and filled with new items derived from the self.layer_list.
         Only non rgb Image layers of ndim > 2 are valid as top level items. Items for
         Points and Shapes layers are appended to each top level item.
+
+        Parameters
+        ----------
+        layer_list : napari.components.layerlist.LayerList
+            Napari LayerList containing the layers of the napari main viewer.
         """
         self.clear()
-        il_items = []
+        source_items = []
         selection_layers = []
 
-        for layer in self.layer_list:
+        for layer in layer_list:
             if (
                 layer._type_string == "image"
                 and layer.ndim > 2
                 and not layer.rgb
             ):
-                il_items.append(SourceLayerItem(layer=layer))
+                source_items.append(LayerSelectionItem(layer=layer))
             elif layer._type_string in ["points", "shapes"]:
                 selection_layers.append(layer)
 
-        for item in il_items:
+        for item in source_items:
             item.appendRows(
-                [SelectionLayerItem(layer=layer) for layer in selection_layers]
+                [LayerSelectionItem(layer=layer) for layer in selection_layers]
             )
-            self.appendRow(item)
-        self.dataChanged.emit(QModelIndex(), QModelIndex())
+        self.insertColumn(0, source_items[::-1])
+        self.dataChanged.emit(QtCore.QModelIndex(), QtCore.QModelIndex())
 
     def checkedItems(self) -> List[Tuple[Any, List[Any]]]:
         """Return the layers of all items with the check state QtCore.Qt.Checked and
@@ -268,52 +252,51 @@ class SelectionModel(QStandardItemModel):
             if item.checkState() == Qt.Checked:
                 if item.hasChildren():
                     children = [
-                        item.child(idx).data(role=Qt.UserRole + 7)
+                        item.child(idx).data(role=Qt.UserRole + 2)
                         for idx in range(item.rowCount())
                         if item.child(idx).checkState() == Qt.Checked
                     ]
                 else:
                     children = []
-                checked.append((item.data(role=Qt.UserRole + 7), children))
+                checked.append((item.data(role=Qt.UserRole + 2), children))
         return checked
 
-    def indexFromText(self, search_text: str) -> Union[int, List[int]]:
-        """Returns all items which text attribute matches search_text.
 
-        Parameters
-        ----------
-        search_text : str
-            Text to check against.
-
-        Returns
-        -------
-        int | List[int]
-            The indices of all items which text attribute matches search_text.
-        """
-        matches = []
-        for index in range(self.rowCount()):
-            item = self.item(index)
-            if item.text() == search_text:
-                matches.append(index)
-        if len(matches) == 1:
-            return matches[0]
-        return matches
-
-
-class TimeSeriesTableModel(QAbstractTableModel):
+class TimeSeriesTableModel(QtCore.QAbstractTableModel):
     """Subclass of QtCore.QAbstractTableModel.
 
     This class stores the data extracted from selected layers in a two dimensional, table like format.
     The stored data can be displayed with a QtWidget.QTableView widget.
 
-    Attributes:
+    Attributes
+    ----------
+    source : napari_matplotlib.base.NapariMPLWidget
+        Plotting widget to load data from.
+
+    Methods
+    -------
+    data(index=Union[QtCore.QModelIndex, Tuple[int,...]], role=QtCore.Qt.ItemDataRole)
+
+    headerData(section=int, orientation=QtCore.Qt.Orientation, role=Qtcore.Qt.ItemDataRole)
+
+    update()
+
+    rowCount(index=QtCore.QModelIndex)
+
+    columnCount(index=QtCore.QModelIndex)
+
+    toClipboard(selectionModel=QtCore.QItemSelectionModel)
+
+    toCSV(path=str, selectionModel=QtCore.QItemSelectionModel)
+
+    _selection_to_pandas_iloc(selectionModel=QtCore.QItemSelectionModel)
 
     """
 
     def __init__(
         self,
-        source: Optional[VoxelPlotter] = None,
-        parent: Optional[QObject] = None,
+        source: Optional[NapariMPLWidget] = None,
+        parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self.source = source
@@ -344,12 +327,11 @@ class TimeSeriesTableModel(QAbstractTableModel):
                 return False
         return False'''
 
-    def setSource(self, source):
-        self.source = source
-
     def data(
-        self, index: Union[QModelIndex, tuple], role=Qt.DisplayRole
-    ) -> Union[str, QVariant]:
+        self,
+        index: Union[QtCore.QModelIndex, Tuple[int, ...]],
+        role: Qt.ItemDataRole = Qt.DisplayRole,
+    ) -> Union[str, QtCore.QVariant]:
         """Returns the data stored under the given role for the item referred to by the index.
 
         :param index: index to write at as tuple (row, col) or QModelIndex
@@ -362,9 +344,9 @@ class TimeSeriesTableModel(QAbstractTableModel):
             elif index.isValid():
                 r, c = index.row(), index.column()
             else:
-                return QVariant()
+                return QtCore.QVariant()
             return str(self._data.iloc[r, c])
-        return QVariant()
+        return QtCore.QVariant()
 
     # currently not necessary
     '''def setHeaderData(self, section: int, orientation: Qt.Orientation, value: str, role: Qt.ItemDataRole = Qt.EditRole) -> bool:
@@ -416,7 +398,7 @@ class TimeSeriesTableModel(QAbstractTableModel):
                 return str(self._data.columns[section])
             elif orientation == Qt.Vertical:
                 return str(self._data.index[section])
-        return QVariant()
+        return QtCore.QVariant()
 
     def update(self):
         """Update the underlying dataframe and emit a layoutChanged signal.
@@ -432,19 +414,19 @@ class TimeSeriesTableModel(QAbstractTableModel):
             return True
         return False
 
-    def rowCount(self, index: QModelIndex = ...) -> int:
+    def rowCount(self, index: QtCore.QModelIndex = ...) -> int:
         """
         Return row count.
         """
         return len(self._data)
 
-    def columnCount(self, index: QModelIndex = ...) -> int:
+    def columnCount(self, index: QtCore.QModelIndex = ...) -> int:
         """
         Return column count.
         """
         return len(self._data.columns)
 
-    def toClipboard(self, selectionModel: QItemSelectionModel) -> None:
+    def toClipboard(self, selectionModel: QtCore.QItemSelectionModel) -> None:
         """Copy selected data to clipboard.
         If selectionModel has no selection copy whole dataframe.
 
@@ -456,7 +438,9 @@ class TimeSeriesTableModel(QAbstractTableModel):
         else:  # if no selection, copy whole dataframe
             self._data.to_clipboard()
 
-    def toCSV(self, path: str, selectionModel: QItemSelectionModel) -> None:
+    def toCSV(
+        self, path: str, selectionModel: QtCore.QItemSelectionModel
+    ) -> None:
         """Copy selected data to clipboard.
         If selectionModel has no selection save whole dataframe to path.
 
@@ -471,7 +455,7 @@ class TimeSeriesTableModel(QAbstractTableModel):
 
     @staticmethod
     def _selection_to_pandas_iloc(
-        selectionModel: QItemSelectionModel,
+        selectionModel: QtCore.QItemSelectionModel,
     ) -> Union[Tuple, Tuple[Any, Any]]:
         """Extract a selection from a QItemSelectionModel and convert to an index compatible with pandas DataFrame.iloc method.
 

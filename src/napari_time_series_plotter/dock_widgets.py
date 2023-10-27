@@ -38,16 +38,15 @@ class TSPExplorer(QtWidgets.QWidget):
         self, napari_viewer, parent: typing.Optional[QtWidgets.QWidget] = None
     ) -> None:
         super().__init__(parent)
-        self.viewer = napari_viewer
 
         # subwidgets
         self.tabs = QtWidgets.QTabWidget()
-        self.selector = LayerSelector(self.viewer)
+        self.selector = LayerSelector(napari_viewer)
         self.options = OptionsManager()
         self.plotter = VoxelPlotter(
-            self.viewer, self.selector, self.options.plotter_options()
+            napari_viewer, self.selector, self.options.plotter_options()
         )
-        self.tabs.addTab(self.plotter, "Plotter")
+        self.tabs.addTab(self.plotter, "Plot")
         self.tabs.addTab(self.options, "Options")
 
         # data models
@@ -61,27 +60,10 @@ class TSPExplorer(QtWidgets.QWidget):
         self.setLayout(layout)
 
         # handle events
-        self.viewer.layers.events.inserted.connect(
-            self._layer_list_changed_callback
-        )
-        self.viewer.layers.events.removed.connect(
-            self._layer_list_changed_callback
-        )
         self.selector.model().itemChanged.connect(self.plotter.update_layers)
         self.options.plotter_option_changed.connect(
             self.plotter.update_options
         )
-
-    def _layer_list_changed_callback(self, event):
-        """Callback function for layer list changes.
-
-        Update the selector model on each layer list change to insert or remove items accordingly.
-        """
-        if event.type in ["inserted", "removed", "reordered"]:
-            value = event.value
-            etype = event.type
-            if value._type_string == "image" and value.ndim in [3, 4]:
-                self.selector.update_model(value, etype)
 
 
 # TODO: TSPInspector besseren namen finden
