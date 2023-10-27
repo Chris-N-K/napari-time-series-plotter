@@ -231,7 +231,7 @@ class VoxelPlotter(NapariMPLWidget):
         """
         Overwrite the layers attribute with the currently checked items in the selector model and re-draw.
         """
-        self.layers = self.selector.model().checkedItems()
+        self.layers = self.selector.model().selectedLayers()
         self._draw()
 
     def update_options(self, options_dict: dict):

@@ -32,8 +32,6 @@ class LayerSelectionItem(QtGui.QStandardItem):
     ----------
     _layer : napari.layers.Layer
         Parent napari layer.
-    _tsdata : List[Union[int, float]]
-        Time series data extracted from the parent layer.
 
     Methods
     -------
@@ -51,12 +49,13 @@ class LayerSelectionItem(QtGui.QStandardItem):
     findChildren(data=Any, role=Optional[Qt.ItemDataRole])
         Return list of indices, of child items containin matching data for the given
         role.
+    isChecked()
+        Return True if check state is Qt.Checked, else False.
     """
 
     def __init__(self, layer: Any, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._layer = layer
-        self._tsdata: List[Union[float, int]] = []
 
         icon = QtGui.QIcon()
         icon.addFile(
@@ -74,8 +73,6 @@ class LayerSelectionItem(QtGui.QStandardItem):
             return self._layer.name
         if role == Qt.UserRole + 1:
             return self._layer._type_string
-        if role == Qt.UserRole + 2:
-            return str(self._tsdata)
         return super().data(role)
 
     def flags(self) -> Qt.ItemFlags:
@@ -116,15 +113,19 @@ class LayerSelectionItem(QtGui.QStandardItem):
 
     def findChildren(
         self, data: Any, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole
-    ) -> List[QtCore.QModelIndex]:
+    ) -> List[object]:
         """
         Return list of indices, of child items containin matching data for the given role.
         """
-        return [
-            child.index()
-            for child in self.children()
-            if child.data(role) == data
-        ]
+        return [child for child in self.children() if child.data(role) == data]
+
+    def isChecked(self) -> bool:
+        """
+        Return True if check state is Qt.Checked, else False.
+        """
+        if self.checkState() == Qt.Checked:
+            return True
+        return False
 
 
 # TODO: should use the specific classes for the source and selection layers
@@ -141,12 +142,14 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
 
     Methods
     -------
+    _layer_inserted_callback(event=napari.utils.events.Event)
+        Callback for layer list inserted event.
+    _layer_removed_callback(event=napari.utils.events.Event)
+        Callback for layer list removed event.
     update()
-
-    checkedItems()
-
-    indexFromText()
-
+        Update all model items.
+    selectedLayers()
+        Return all selected layer combinations.
     """
 
     def __init__(
@@ -174,7 +177,21 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         layer_list.events.inserted.connect(self._layer_inserted_callback)
         layer_list.events.removed.connect(self._layer_removed_callback)
 
-    def _layer_inserted_callback(self, event: napari.utils.events.Event):
+    def _layer_inserted_callback(
+        self, event: napari.utils.events.Event
+    ) -> None:
+        """Callback for layer list inserted event.
+
+        Add new items and / or childitems every time a new layer is added to the
+        layer list. Insertion of an Image layer adds an item to the model with as
+        many childitems as Points and Shapes layers in the layer list. Insertion
+        of a Points or Shapes layer adds a child item to each item in the moddel.
+
+        Parameters
+        ----------
+        event : napari.utils.events.Event
+            Napari event originating from the layer list or subobjects.
+        """
         layer = event.value
         if layer._type_string == "image" and layer.ndim > 2 and not layer.rgb:
             item = LayerSelectionItem(layer)
@@ -189,7 +206,21 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
             for row in range(self.rowCount()):
                 self.item(row, 0).insertRow(0, LayerSelectionItem(layer))
 
-    def _layer_removed_callback(self, event: napari.utils.events.Event):
+    def _layer_removed_callback(
+        self, event: napari.utils.events.Event
+    ) -> None:
+        """Callback for layer list removed event.
+
+        Remove items and / or childitems every time a layer is removed from the
+        layer list. Removal of an Image layer removes the corresponding item from
+        the model and all its childitems. Removal of a Points or Shapes layer
+        removes the corresponding child items from all items in the model.
+
+        Parameters
+        ----------
+        event : napari.utils.events.Event
+            Napari event originating from the layer list or subobjects.
+        """
         layer = event.value
         if layer._type_string == "image":
             self.removeRow(self.findItems(layer.name)[0].index().row())
@@ -197,11 +228,8 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
             for row in range(self.rowCount()):
                 item = self.item(row, 0)
                 if item.hasChildren():
-                    rows = [
-                        idx.row()
-                        for idx in item.childIndexFromData(layer.name)
-                    ]
-                    item.removeRows(rows)
+                    for child in item.findChildren(layer.name):
+                        item.removeRow(child.index().row())
 
     def update(self, layer_list) -> None:
         """Update all model items.
@@ -231,14 +259,19 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
 
         for item in source_items:
             item.appendRows(
-                [LayerSelectionItem(layer=layer) for layer in selection_layers]
+                [
+                    LayerSelectionItem(layer=layer)
+                    for layer in selection_layers
+                ][::-1]
             )
         self.insertColumn(0, source_items[::-1])
         self.dataChanged.emit(QtCore.QModelIndex(), QtCore.QModelIndex())
 
-    def checkedItems(self) -> List[Tuple[Any, List[Any]]]:
-        """Return the layers of all items with the check state QtCore.Qt.Checked and
-        their repective children with the same check state.
+    def selectedLayers(self) -> List[Tuple[Any, List[Any]]]:
+        """Return all selected layer combinations.
+
+        Returns the layers of all items with the check state QtCore.Qt.Checked and
+        their repective children with the same check state in a nested list.
 
         Returns
         -------
@@ -249,16 +282,16 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         checked = []
         for index in range(self.rowCount()):
             item = self.item(index)
-            if item.checkState() == Qt.Checked:
+            if item.isChecked():
                 if item.hasChildren():
                     children = [
-                        item.child(idx).data(role=Qt.UserRole + 2)
+                        item.child(idx).layer()
                         for idx in range(item.rowCount())
-                        if item.child(idx).checkState() == Qt.Checked
+                        if item.child(idx).isChecked()
                     ]
                 else:
                     children = []
-                checked.append((item.data(role=Qt.UserRole + 2), children))
+                checked.append((item.layer(), children))
         return checked
 
 
