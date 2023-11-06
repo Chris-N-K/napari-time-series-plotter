@@ -196,8 +196,9 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
             item = LayerSelectionItem(layer)
             child_items = [
                 LayerSelectionItem(layer)
-                for layer in self._layer_list
-                if layer._type_string in ["points", "shapes"]
+                for llitem in self._layer_list
+                if llitem._type_string in ["points", "shapes"]
+                and layer.ndim == llitem.ndim
             ]
             item.insertColumn(0, child_items)
             self.insertRow(0, item)
