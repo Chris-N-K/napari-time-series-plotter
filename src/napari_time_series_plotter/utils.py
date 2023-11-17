@@ -1,10 +1,20 @@
-from typing import Any, Collection, Dict
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    Tuple,
+)
 
+import napari.layers.shapes._shapes_utils as shape_utils
 import numpy as np
-from numpy.typing import NDArray
+import numpy.typing as npt
+from skimage.draw import line, polygon
 
 __all__ = (
-    "get_valid_image_layers",
+    "to_world_space",
+    "to_layer_space",
+    "points_to_ts_indices",
+    "shape_to_ts_indices",
     "add_index_dim",
     "extract_voxel_time_series",
     "extract_ROI_time_series",
@@ -13,18 +23,148 @@ __all__ = (
 
 
 # functions
-def get_valid_image_layers(layer_list):
+def to_world_space(data: npt.NDArray, layer: Any) -> npt.NDArray:
+    """Transform layer point coordinates to viewer world space.
+
+    Data array must contain the points in dim 0 and the
+    coordinates per dimension in dim 1.
+
+    Paramaeters
+    -----------
+    data : np.ndarray
+        Point coordinates in an array.
+    layer
+        Parent layer.
+
+    Returns
+    -------
+        Transformed point coordinates in an array.
     """
-    Extract napari images layers of 3 or more dimensions from the input list.
+    if not np.empty(data):
+        idx = np.concatenate([[True], ~np.all(data[1:] == data[:-1], axis=-1)])
+        tdata = layer._transforms[1:].simplified(data[idx].copy())
+        return tdata
+    return data
+
+
+def to_layer_space(data, layer):
+    """Transform world space point coordinates to layer space.
+
+    Data array must contain the points in dim 0 and the
+    coordinates per dimension in dim 1.
+
+    Paramaeters
+    -----------
+    data : np.ndarray
+        Point coordinates in an array.
+    layer
+        Target napari layer.
+
+    Returns
+    -------
+        Transformed point coordinates in an array.
     """
-    out = [
-        layer
-        for layer in layer_list
-        if layer._type_string == "image"
-        and layer.data.ndim >= 3
-        and not layer.rgb
-    ]
-    return out
+    if not np.empty(data):
+        idx = np.concatenate([[True], ~np.all(data[1:] == data[:-1], axis=-1)])
+        tdata = layer._transforms[1:].simplified.inverse(data[idx].copy())
+        return tdata
+    return data
+
+
+def points_to_ts_indices(
+    points: npt.NDArray, layer
+) -> Tuple[npt.NDArray, ...]:
+    """Transform point coordinates to time series indices for a given layer.
+
+    Points must be maximal one dimension smaller than the target layer.
+    The indices will always be one dimension (t) smaller than the target layer.
+
+    Parameters
+    ----------
+    points: np.ndarray
+        Point coordinates to transform into time series indices.
+    layer: subclass of napari.layer.Layers
+        Layer to generate time series index for.
+
+    Returns
+    -------
+    indices : tuple of np.ndarray
+        Time series indices.
+    """
+    # ensure correct dimensionality
+    ndim = points.shape[1]
+    if ndim < layer.ndim - 1:
+        raise ValueError(
+            f"Dimensionality of position ({ndim}) must not be smaller then dimensionality of layer ({layer.ndim}) -1."
+        )
+
+    tpoints = np.round(to_layer_space(points, layer)).astype(int)
+    indices = tuple(tpoints[:, 1:].T)
+    return indices
+
+
+def shape_to_ts_indices(
+    data: npt.NDArray, layer, ellipsis=False, filled=True
+) -> Tuple[npt.NDArray, ...]:
+    """Transform a shapes face or edges to time series indices for a given layer.
+
+    Shape data must be of same or bigger dimensionality as layer or maximal one smaller.
+    The returned index will always be one dimension (t) short.
+
+    Parameters
+    ----------
+    data: npndarray
+        Shape object data to transform into time series indices.
+    layer: subclass of napari.layer.Layers
+        Layer to generate time series index for.
+
+    Returns
+    ------
+    indices : tuple of np.ndarray
+        Tuple with same number of allements as layer.ndim - 1. Each element is
+        an array with the same number of elemnts (number of face voxels) encoding
+        the face voxel positions.
+    """
+    # ensure correct dimensionality
+    ndim = data.shape[1]
+    if ndim < layer.ndim - 1:
+        raise ValueError(
+            f"Dimensionality of the shape ({ndim}) must not be smaller then dimensionality of layer ({layer.ndim}) -1."
+        )
+
+    # remove duplicates and transform to layer space
+    data = to_layer_space(data, layer)
+
+    # determine vertices
+    if ellipsis:
+        if shape_utils.is_collinear(data[:, -2:]):
+            raise ValueError("Shape data must not be collinear.")
+        else:
+            vertices, _ = shape_utils.triangulate_ellipse(data[:, -2:])
+    else:
+        vertices = data[:, -2:]
+
+    # determine y/x indices from vertices
+    if filled:
+        indices = polygon(
+            vertices[:, 0], vertices[:, 1], layer.data.shape[-2:]
+        )
+    else:
+        vertices = np.clip(vertices, 0, layer.data.shape[-2:] - 1)
+        indices = [line(*v1, *v2) for v1, v2 in zip(vertices, vertices[1:])]
+
+    # expand indices to full dimensions
+    if data.shape[1] > 2:
+        if len(np.unique(data[:, :-2], axis=0)) == 1:
+            val = np.unique(np.round(data[:, 1:-2]).astype(int), axis=0)
+            exp = tuple(np.repeat(val, len(indices[0]), axis=0).T)
+            indices = exp + indices
+        else:
+            raise ValueError(
+                "All vertices of a shape must be in a single y/x plane."
+            )
+
+    return indices
 
 
 def add_index_dim(arr1d, scale):
@@ -113,7 +253,7 @@ def extract_ROI_time_series(
 
 def align_value_length(
     dictionary: Dict[Any, Collection]
-) -> Dict[Any, NDArray]:
+) -> Dict[Any, npt.NDArray]:
     """Align the lengths of dictionary values by appending NaNs."""
     max_len = np.max([len(val) for val in dictionary.values()])
     matched = {}
