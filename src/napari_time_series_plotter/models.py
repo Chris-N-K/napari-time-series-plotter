@@ -1,6 +1,8 @@
+import warnings
 from typing import (
     Any,
     Callable,
+    Dict,
     List,
     Optional,
     Sequence,
@@ -14,11 +16,16 @@ import numpy.typing as npt
 import pandas as pd
 from napari_matplotlib.base import NapariMPLWidget
 from qtpy import (
-    QtCore,
     QtGui,
     QtWidgets,
 )
-from qtpy.QtCore import Qt
+from qtpy.QtCore import (
+    QAbstractTableModel,
+    QItemSelectionModel,
+    QModelIndex,
+    Qt,
+    QVariant,
+)
 
 from .utils import (
     align_value_length,
@@ -26,6 +33,8 @@ from .utils import (
     shape_to_ts_indices,
     to_world_space,
 )
+
+warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
 __all__ = (
     "SourceLayerItem",
@@ -150,8 +159,6 @@ class SelectionLayerItem(QtGui.QStandardItem):
         Parent napari layer.
     parent : SourceLayerItem
         Parent item.
-    sum_func : callable
-        Aggregation function for time series data.
 
     Attributes
     ----------
@@ -168,9 +175,6 @@ class SelectionLayerItem(QtGui.QStandardItem):
     _pil_ec : callable
         Parent item layer data event callback connection.
 
-    sum_func : callable
-        Aggregation function for time series data.
-
     Methods
     -------
     __del__()
@@ -183,8 +187,6 @@ class SelectionLayerItem(QtGui.QStandardItem):
         Extract time series indices from parent layer.
     _extract_ts_data()
         Extract time sereis data from parent layer of parent item.
-    _data_event_callback()
-        Excute indice and if needed data extraction upon parent layer data event.
 
     data(role=Qt.ItemDataRole)
         Overload of the QStandardItem.data() method. The method adds functionality
@@ -198,6 +200,10 @@ class SelectionLayerItem(QtGui.QStandardItem):
         Return parent item.
     isChecked()
         Return True if check state is Qt.Checked, else False.
+    updateTSIndices()
+        Update the time series indices of the item.
+    updateTSData()
+        Update the time series data of the item.
     """
 
     def __init__(
@@ -205,7 +211,6 @@ class SelectionLayerItem(QtGui.QStandardItem):
         layer,
         parent: SourceLayerItem,
         *args,
-        sum_func: Optional[Callable] = None,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -220,7 +225,6 @@ class SelectionLayerItem(QtGui.QStandardItem):
 
         self._layer = layer
         self._parent = parent
-        self.sum_func = sum_func
         self._indices = self._extract_indices()
         self._ts_data = self._extract_ts_data()
         self._pl_ec = None
@@ -234,6 +238,8 @@ class SelectionLayerItem(QtGui.QStandardItem):
         self.setEditable(False)
         self.setCheckable(True)
 
+        self._connect_callbacks()
+
     def __del__(self) -> None:
         """
         Run cleanup upon deletion.
@@ -245,10 +251,10 @@ class SelectionLayerItem(QtGui.QStandardItem):
         Connect event callbacks.
         """
         self._pl_ec = self._layer.events.data.connect(
-            lambda event: self._data_event_callback
+            lambda event: self.updateTSIndices()
         )
         self._pil_ec = self._parent.data(Qt.UserRole + 2).events.data.connect(
-            lambda event: self._extract_ts_data
+            lambda event: self.updateTSData()
         )
 
     def _disconnect_callbacks(self) -> None:
@@ -262,9 +268,9 @@ class SelectionLayerItem(QtGui.QStandardItem):
                 self._pil_ec
             )
 
-    def _extract_indices(self) -> Sequence[Tuple[npt.NDArray, ...]]:
+    def _extract_indices(self) -> Sequence[Tuple[Any, ...]]:
         """
-        Extract time series indices from parent layer.
+        Extract time series indices from layer.
         """
         source_layer = self._parent.data(Qt.UserRole + 2)
         if self._layer._type_string == "shapes":
@@ -275,31 +281,27 @@ class SelectionLayerItem(QtGui.QStandardItem):
                 indices.append(sindices)
         else:
             points = to_world_space(self._layer.data, self._layer)
-            indices = [points_to_ts_indices(points, source_layer)]
+            indices = points_to_ts_indices(points, source_layer)
 
         return indices
 
     def _extract_ts_data(self) -> npt.NDArray:
         """
-        Extract time sereis data from parent layer of parent item.
+        Extract time sereis data from layer of parent item.
         """
         source_layer = self._parent.data(Qt.UserRole + 2)
         ts_data = []
         for idx in self._indices:
-            data = source_layer.data[(slice(None),) + idx]
-            if self.sum_func:
-                data = self.sum_func(data, axis=1)
+            data = source_layer.data[idx]
+            if (
+                self._layer._type_string == "shapes"
+                and self.model()
+                and self.model().aggFunc
+            ):
+                data = self.model().aggFunc(data, axis=1)
             ts_data.append(data)
 
-        return np.array(ts_data).T
-
-    def _data_event_callback(self) -> None:
-        """
-        Excute indice and if needed data extraction upon parent layer data event.
-        """
-        new_indices = self._extract_indices()
-        if ~np.array_equal(new_indices, self._indices):
-            self.ts_data = self._extract_ts_data()
+        return np.array(ts_data)
 
     def data(self, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole) -> object:
         """
@@ -315,6 +317,8 @@ class SelectionLayerItem(QtGui.QStandardItem):
             return self._indices
         elif role == Qt.UserRole + 4:
             return self._ts_data
+        elif role == Qt.UserRole + 5:
+            return f"{self._parent.data(Qt.DisplayRole)}_{self._layer.name}"
         return super().data(role)
 
     def flags(self) -> Qt.ItemFlags:
@@ -350,20 +354,35 @@ class SelectionLayerItem(QtGui.QStandardItem):
             return True
         return False
 
+    def updateTSIndices(self) -> None:
+        """
+        Update the stored time series indices and if the indices changed time series data.
+        """
+        new_indices = self._extract_indices()
+        if ~np.array_equal(new_indices, self._indices):
+            self._indices = new_indices
+            self._ts_data = self._extract_ts_data()
 
-# TODO: rework to QAbstractItemModel
+    def updateTSData(self) -> None:
+        """
+        Update the stored time series data.
+        """
+        self._ts_data = self._extract_ts_data()
+
+
 class LayerSelectionModel(QtGui.QStandardItemModel):
-    """Subclass of QtGui.QStandardItemModel.
+    """Model class for layer selection and time series extraction.
 
-    This class can hold QtGui.QStandardItems and derived subclasses and can be used
-    together with Qt viewer classes.
+    This model holds SourceLayerItems and their children and manager layer
+    selection and time series indice and data extraction. It is meant to be used
+    together with LayerSelector widget classes.
 
     Parameters
     ----------
     layer_list : napari.components.layerlist.LayerList
         Napari LayerList containing the layers of the napari main viewer.
-    sum_func : callable
-        Aggregation function for time series data.
+    agg_func : callable
+        Aggregation function for time series data, optional.
     parent : qtpy.QtWidgets.QWidget
         Parent widget.
 
@@ -371,8 +390,12 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
     ----------
     _layer_list : napari.components.layerlist.LayerList
         Napari LayerList containing the layers of the napari main viewer.
-    sum_func : callable
-        Aggregation function for selections.
+    aggFunc : callable | None
+        Aggregation function for time series data.
+    tsData : dict of str and np.ndarray
+        Dictionary containing all extracted time series. Keys are generated
+        from the source and selection layer names and the index of the
+        indices.
 
     Methods
     -------
@@ -380,27 +403,25 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         Callback for layer list inserted event.
     _layer_removed_callback(event=napari.utils.events.Event)
         Callback for layer list removed event.
-    update()
-        Update all model items.
-    selectedLayers()
-        Return all selected layer combinations.
+    _init_data()
+        Initiate model items from layer_list.
+    get_ts_data()
+        Return the time series data of all checked childitems.
     """
 
     def __init__(
         self,
         layer_list: napari.components.layerlist.LayerList,
-        sum_func: Optional[Callable] = None,
+        agg_func: Optional[Callable] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self._layer_list = layer_list
-        self.sum_func = sum_func
+        self._agg_func = agg_func
 
-        self.update(layer_list)
+        self._init_data(layer_list)
         layer_list.events.connect(
-            lambda event: self.dataChanged.emit(
-                QtCore.QModelIndex(), QtCore.QModelIndex()
-            )
+            lambda event: self.dataChanged.emit(QModelIndex(), QModelIndex())
             if event.type == "name"
             else None
         )
@@ -426,7 +447,7 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         if layer._type_string == "image" and layer.ndim > 2 and not layer.rgb:
             item = SourceLayerItem(layer)
             child_items = [
-                SelectionLayerItem(llitem, item, sum_func=self.sum_func)
+                SelectionLayerItem(llitem, item)
                 for llitem in self._layer_list
                 if llitem._type_string in ["points", "shapes"]
                 and llitem.ndim >= layer.ndim - 1
@@ -439,9 +460,7 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
                 if item.data(role=Qt.UserRole + 2).ndim - 1 <= layer.ndim:
                     item.insertRow(
                         0,
-                        SelectionLayerItem(
-                            layer, item, sum_func=self.sum_func
-                        ),
+                        SelectionLayerItem(layer, item),
                     )
 
     def _layer_removed_callback(
@@ -469,8 +488,8 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
                     for child in item.findChildren(layer.name):
                         item.removeRow(child.index().row())
 
-    def update(self, layer_list) -> None:
-        """Update all model items.
+    def _init_data(self, layer_list) -> None:
+        """Initiate model items from layer_list.
 
         The model is cleared and filled with new items derived from the self.layer_list.
         Only non rgb Image layers of ndim > 2 are valid as top level items. Items for
@@ -498,44 +517,67 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         for item in source_items:
             item.appendRows(
                 [
-                    SelectionLayerItem(layer, item, sum_func=self.sum_func)
+                    SelectionLayerItem(layer, item)
                     for layer in selection_layers
                     if layer.ndim >= item.data(role=Qt.UserRole + 2).ndim - 1
                 ][::-1]
             )
         self.insertColumn(0, source_items[::-1])
-        self.dataChanged.emit(QtCore.QModelIndex(), QtCore.QModelIndex())
+        self.dataChanged.emit(QModelIndex(), QModelIndex())
 
-    def selectedLayers(self) -> List[Tuple[Any, List[Any]]]:
-        """Return all selected layer combinations.
+    @property
+    def tsData(self) -> Dict[str, npt.NDArray]:
+        """Return a dict of the time series data of all checked childitems and their identifiers.
 
-        Returns the layers of all items with the check state QtCore.Qt.Checked and
-        their repective children with the same check state in a nested list.
+        The keys are generated from the source and selection layer names and the index of the time series indices.
 
         Returns
         -------
-        List[Tuple[Any, List[Any]]]
-            A list of tuples containing the layer of each checked item and a list of
-            layers of their checked child items.
+        Dict of str and np.ndarray
+            A dictionary containing the time series identifiers as keys and the time series data as values.
         """
-        checked = []
+        ts_data = {}
         for index in range(self.rowCount()):
             item = self.item(index)
-            if item.isChecked():
-                if item.hasChildren():
-                    children = [
-                        item.child(idx).data(Qt.UserData + 2)
-                        for idx in range(item.rowCount())
-                        if item.child(idx).isChecked()
-                    ]
-                else:
-                    children = []
-                checked.append((item.data(Qt.UserRole + 2), children))
-        return checked
+            if item.isChecked() and item.hasChildren():
+                for child in item.children():
+                    if child.isChecked():
+                        item_ts_data = {
+                            f"{child.data(Qt.UserRole + 5)}_{idx}": ts
+                            for idx, ts in enumerate(
+                                child.data(Qt.UserRole + 4)
+                            )
+                        }
+                    else:
+                        item_ts_data = {}
+                    ts_data.update(item_ts_data)
+        return ts_data
+
+    @property
+    def aggFunc(self) -> Union[Callable, None]:
+        """
+        Return the time series aggregation function.
+        """
+        return self._agg_func
+
+    @aggFunc.setter
+    def aggFunc(self, func: Union[Callable, None]) -> None:
+        """
+        Set the time series data aggregation function and update all time series data.
+        """
+        self._agg_func = func
+        self.blockSignals(True)
+        for row in range(self.rowCount()):
+            item = self.item(row, 0)
+            if item.hasChildren():
+                for child in item.children():
+                    child.updateTSData()
+        self.blockSignals(False)
+        self.dataChanged.emit(QModelIndex(), QModelIndex())
 
 
-class TimeSeriesTableModel(QtCore.QAbstractTableModel):
-    """Subclass of QtCore.QAbstractTableModel.
+class TimeSeriesTableModel(QAbstractTableModel):
+    """Subclass of QAbstractTableModel.
 
     This class stores the data extracted from selected layers in a two dimensional, table like format.
     The stored data can be displayed with a QtWidget.QTableView widget.
@@ -547,21 +589,21 @@ class TimeSeriesTableModel(QtCore.QAbstractTableModel):
 
     Methods
     -------
-    data(index=Union[QtCore.QModelIndex, Tuple[int,...]], role=QtCore.Qt.ItemDataRole)
+    data(index=Union[QModelIndex, Tuple[int,...]], role=Qt.ItemDataRole)
 
-    headerData(section=int, orientation=QtCore.Qt.Orientation, role=Qtcore.Qt.ItemDataRole)
+    headerData(section=int, orientation=Qt.Orientation, role=Qt.ItemDataRole)
 
     update()
 
-    rowCount(index=QtCore.QModelIndex)
+    rowCount(index=QModelIndex)
 
-    columnCount(index=QtCore.QModelIndex)
+    columnCount(index=QModelIndex)
 
-    toClipboard(selectionModel=QtCore.QItemSelectionModel)
+    toClipboard(selectionModel=QItemSelectionModel)
 
-    toCSV(path=str, selectionModel=QtCore.QItemSelectionModel)
+    toCSV(path=str, selectionModel=QItemSelectionModel)
 
-    _selection_to_pandas_iloc(selectionModel=QtCore.QItemSelectionModel)
+    _selection_to_pandas_iloc(selectionModel=QItemSelectionModel)
 
     """
 
@@ -575,7 +617,7 @@ class TimeSeriesTableModel(QtCore.QAbstractTableModel):
         self._data = pd.DataFrame()
 
     # currently not necessary
-    '''def setData(self, index: Union[QtCore.QModelIndex, tuple], value: Union[int, float], role: Qt.ItemDataRole = Qt.EditRole) -> bool:
+    '''def setData(self, index: Union[QModelIndex, tuple], value: Union[int, float], role: Qt.ItemDataRole = Qt.EditRole) -> bool:
         """Sets the role data for the item at index to value.
 
         Returns true if successful; otherwise returns false.
@@ -601,9 +643,9 @@ class TimeSeriesTableModel(QtCore.QAbstractTableModel):
 
     def data(
         self,
-        index: Union[QtCore.QModelIndex, Tuple[int, ...]],
+        index: Union[QModelIndex, Tuple[int, ...]],
         role: Qt.ItemDataRole = Qt.DisplayRole,
-    ) -> Union[str, QtCore.QVariant]:
+    ) -> Union[str, QVariant]:
         """Returns the data stored under the given role for the item referred to by the index.
 
         :param index: index to write at as tuple (row, col) or QModelIndex
@@ -616,9 +658,9 @@ class TimeSeriesTableModel(QtCore.QAbstractTableModel):
             elif index.isValid():
                 r, c = index.row(), index.column()
             else:
-                return QtCore.QVariant()
+                return QVariant()
             return str(self._data.iloc[r, c])
-        return QtCore.QVariant()
+        return QVariant()
 
     # currently not necessary
     '''def setHeaderData(self, section: int, orientation: Qt.Orientation, value: str, role: Qt.ItemDataRole = Qt.EditRole) -> bool:
@@ -670,7 +712,7 @@ class TimeSeriesTableModel(QtCore.QAbstractTableModel):
                 return str(self._data.columns[section])
             elif orientation == Qt.Vertical:
                 return str(self._data.index[section])
-        return QtCore.QVariant()
+        return QVariant()
 
     def update(self):
         """Update the underlying dataframe and emit a layoutChanged signal.
@@ -686,19 +728,19 @@ class TimeSeriesTableModel(QtCore.QAbstractTableModel):
             return True
         return False
 
-    def rowCount(self, index: QtCore.QModelIndex = ...) -> int:
+    def rowCount(self, index: QModelIndex = ...) -> int:
         """
         Return row count.
         """
         return len(self._data)
 
-    def columnCount(self, index: QtCore.QModelIndex = ...) -> int:
+    def columnCount(self, index: QModelIndex = ...) -> int:
         """
         Return column count.
         """
         return len(self._data.columns)
 
-    def toClipboard(self, selectionModel: QtCore.QItemSelectionModel) -> None:
+    def toClipboard(self, selectionModel: QItemSelectionModel) -> None:
         """Copy selected data to clipboard.
         If selectionModel has no selection copy whole dataframe.
 
@@ -710,9 +752,7 @@ class TimeSeriesTableModel(QtCore.QAbstractTableModel):
         else:  # if no selection, copy whole dataframe
             self._data.to_clipboard()
 
-    def toCSV(
-        self, path: str, selectionModel: QtCore.QItemSelectionModel
-    ) -> None:
+    def toCSV(self, path: str, selectionModel: QItemSelectionModel) -> None:
         """Copy selected data to clipboard.
         If selectionModel has no selection save whole dataframe to path.
 
@@ -727,7 +767,7 @@ class TimeSeriesTableModel(QtCore.QAbstractTableModel):
 
     @staticmethod
     def _selection_to_pandas_iloc(
-        selectionModel: QtCore.QItemSelectionModel,
+        selectionModel: QItemSelectionModel,
     ) -> Union[Tuple, Tuple[Any, Any]]:
         """Extract a selection from a QItemSelectionModel and convert to an index compatible with pandas DataFrame.iloc method.
 

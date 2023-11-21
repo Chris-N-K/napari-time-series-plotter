@@ -2,6 +2,7 @@ from typing import (
     Any,
     Collection,
     Dict,
+    List,
     Tuple,
 )
 
@@ -40,7 +41,7 @@ def to_world_space(data: npt.NDArray, layer: Any) -> npt.NDArray:
     -------
         Transformed point coordinates in an array.
     """
-    if not np.empty(data):
+    if data.size != 0:
         idx = np.concatenate([[True], ~np.all(data[1:] == data[:-1], axis=-1)])
         tdata = layer._transforms[1:].simplified(data[idx].copy())
         return tdata
@@ -64,16 +65,14 @@ def to_layer_space(data, layer):
     -------
         Transformed point coordinates in an array.
     """
-    if not np.empty(data):
+    if data.size != 0:
         idx = np.concatenate([[True], ~np.all(data[1:] == data[:-1], axis=-1)])
         tdata = layer._transforms[1:].simplified.inverse(data[idx].copy())
         return tdata
     return data
 
 
-def points_to_ts_indices(
-    points: npt.NDArray, layer
-) -> Tuple[npt.NDArray, ...]:
+def points_to_ts_indices(points: npt.NDArray, layer) -> List[Tuple[Any, ...]]:
     """Transform point coordinates to time series indices for a given layer.
 
     Points must be maximal one dimension smaller than the target layer.
@@ -99,13 +98,13 @@ def points_to_ts_indices(
         )
 
     tpoints = np.round(to_layer_space(points, layer)).astype(int)
-    indices = tuple(tpoints[:, 1:].T)
+    indices = [(slice(None), *p[1:]) for p in tpoints]
     return indices
 
 
 def shape_to_ts_indices(
     data: npt.NDArray, layer, ellipsis=False, filled=True
-) -> Tuple[npt.NDArray, ...]:
+) -> Tuple[Any, ...]:
     """Transform a shapes face or edges to time series indices for a given layer.
 
     Shape data must be of same or bigger dimensionality as layer or maximal one smaller.
@@ -164,7 +163,7 @@ def shape_to_ts_indices(
                 "All vertices of a shape must be in a single y/x plane."
             )
 
-    return indices
+    return (slice(None),) + indices
 
 
 def add_index_dim(arr1d, scale):
