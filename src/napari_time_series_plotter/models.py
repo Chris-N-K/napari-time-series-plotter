@@ -361,13 +361,16 @@ class SelectionLayerItem(QtGui.QStandardItem):
         new_indices = self._extract_indices()
         if ~np.array_equal(new_indices, self._indices):
             self._indices = new_indices
-            self._ts_data = self._extract_ts_data()
+            self.updateTSData()
 
     def updateTSData(self) -> None:
         """
         Update the stored time series data.
         """
         self._ts_data = self._extract_ts_data()
+        model = self.model()
+        if model:
+            model.dataChanged.emit(self.index(), self.index())
 
 
 class LayerSelectionModel(QtGui.QStandardItemModel):
