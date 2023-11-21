@@ -5,7 +5,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Sequence,
     Tuple,
     Union,
 )
@@ -23,6 +22,7 @@ from qtpy.QtCore import (
     QAbstractTableModel,
     QItemSelectionModel,
     QModelIndex,
+    QSortFilterProxyModel,
     Qt,
     QVariant,
 )
@@ -268,7 +268,7 @@ class SelectionLayerItem(QtGui.QStandardItem):
                 self._pil_ec
             )
 
-    def _extract_indices(self) -> Sequence[Tuple[Any, ...]]:
+    def _extract_indices(self) -> List[Tuple[Any, ...]]:
         """
         Extract time series indices from layer.
         """
@@ -373,6 +373,77 @@ class SelectionLayerItem(QtGui.QStandardItem):
             model.dataChanged.emit(self.index(), self.index())
 
 
+class LivePlotItem(QtGui.QStandardItem):
+    def __init__(self):
+        super().__init__()
+        self._cpos = np.array([])
+        self._ts_data = self._extract_ts_data()
+
+        self.setEditable(False)
+        self.setCheckable(False)
+
+    def _extract_ts_data(self) -> npt.NDArray:
+        """
+        Extract time sereis data from all selected source layers.
+        """
+        model = self.model()
+        ts_data = []
+        if model and self.cpos.size != 0:
+            for row in range(model.rowCount()):
+                item = model.item(row, 0)
+                if item.data() != "LivePlot" and item.isChecked():
+                    source_layer = item.data(Qt.UserRole + 2)
+                    cpos = np.expand_dims(self.cpos, axis=0)
+                    idx = points_to_ts_indices(cpos, source_layer)[0]
+                    data = source_layer.data[idx]
+                    ts_data.append(data)
+
+        return np.array(ts_data)
+
+    def data(self, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole) -> object:
+        """
+        Return the data stored under role.
+        """
+        if role == Qt.DisplayRole:
+            return "LivePlot"
+        elif role == Qt.UserRole + 4:
+            return self._ts_data
+        elif role == Qt.UserRole + 5:
+            return f"P{[':', *self._cpos[1:]]}_layer"
+        return super().data(role)
+
+    def type(self) -> int:
+        """
+        Return item type.
+        """
+        return QtGui.QStandardItem.UserType + 3
+
+    @property
+    def cpos(self) -> npt.NDArray:
+        """
+        Return cpos.
+        """
+        return self._cpos
+
+    @cpos.setter
+    def cpos(self, coords: npt.NDArray):
+        """
+        Set cpos to coords and update time series data.
+        """
+        self._cpos = coords
+        self.updateTSData()
+
+    def updateTSData(self):
+        """
+        Update the stored time series data.
+        """
+        ts_data = self._extract_ts_data()
+        model = self.model()
+        if ts_data.size != 0 and model is not None:
+            self._ts_data = ts_data
+            model.dataChanged.emit(self.index(), self.index())
+
+
 class LayerSelectionModel(QtGui.QStandardItemModel):
     """Model class for layer selection and time series extraction.
 
@@ -414,22 +485,23 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
 
     def __init__(
         self,
-        layer_list: napari.components.layerlist.LayerList,
+        napari_viewer: napari.Viewer,
         agg_func: Optional[Callable] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
-        self._layer_list = layer_list
+        self._layer_list = napari_viewer.layers
         self._agg_func = agg_func
 
-        self._init_data(layer_list)
-        layer_list.events.connect(
+        self._init_data(self._layer_list)
+        self._layer_list.events.connect(
             lambda event: self.dataChanged.emit(QModelIndex(), QModelIndex())
             if event.type == "name"
             else None
         )
-        layer_list.events.inserted.connect(self._layer_inserted_callback)
-        layer_list.events.removed.connect(self._layer_removed_callback)
+        self._layer_list.events.inserted.connect(self._layer_inserted_callback)
+        self._layer_list.events.removed.connect(self._layer_removed_callback)
+        napari_viewer.mouse_move_callbacks.append(self._mouse_move_callback)
 
     def _layer_inserted_callback(
         self, event: napari.utils.events.Event
@@ -460,7 +532,10 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         elif layer._type_string in ["points", "shapes"]:
             for row in range(self.rowCount()):
                 item = self.item(row, 0)
-                if item.data(role=Qt.UserRole + 2).ndim - 1 <= layer.ndim:
+                if (
+                    item.data() != "LivePlot"
+                    and item.data(role=Qt.UserRole + 2).ndim - 1 <= layer.ndim
+                ):
                     item.insertRow(
                         0,
                         SelectionLayerItem(layer, item),
@@ -490,6 +565,25 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
                 if item.hasChildren():
                     for child in item.findChildren(layer.name):
                         item.removeRow(child.index().row())
+
+    def _mouse_move_callback(
+        self, viewer: napari.Viewer, event: napari.utils.events.Event
+    ) -> None:
+        """Callback for mouse move events.
+
+        Set cpos of the models LivePlot item.
+
+        Parameters
+        ----------
+        viewer : napari.Viewer
+            Main napari viewer.
+        event : napari.utils.events.Event
+            Napari event originating from the layer list or subobjects.
+        """
+        if "Shift" in event.modifiers:
+            items = self.findItems("LivePlot")
+            if items:
+                items[0].cpos = np.round(viewer.cursor.position).astype(int)
 
     def _init_data(self, layer_list) -> None:
         """Initiate model items from layer_list.
@@ -525,7 +619,7 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
                     if layer.ndim >= item.data(role=Qt.UserRole + 2).ndim - 1
                 ][::-1]
             )
-        self.insertColumn(0, source_items[::-1])
+        self.insertColumn(0, source_items[::-1] + [LivePlotItem()])
         self.dataChanged.emit(QModelIndex(), QModelIndex())
 
     @property
@@ -542,7 +636,13 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         ts_data = {}
         for index in range(self.rowCount()):
             item = self.item(index)
-            if item.isChecked() and item.hasChildren():
+            if item.data() == "LivePlot":
+                item_ts_data = {
+                    f"{item.data(Qt.UserRole + 5)}_{idx}": ts
+                    for idx, ts in enumerate(item.data(Qt.UserRole + 4))
+                }
+                ts_data.update(item_ts_data)
+            elif item.isChecked() and item.hasChildren():
                 for child in item.children():
                     if child.isChecked():
                         item_ts_data = {
@@ -805,3 +905,51 @@ class TimeSeriesTableModel(QAbstractTableModel):
                     slice(min(cell_idxs[1]), max(cell_idxs[1]) + 1),
                 )
         return ()
+
+
+class ItemTypeFilterProxyModel(QSortFilterProxyModel):
+    """Filter model for item filtering by type.
+
+    Items with a type code matching the filter will be excluded.
+
+    Attributes
+    ----------
+    _ftype : None | Any
+
+    Methods
+    -------
+    filterType()
+        Return item filter type.
+    setFilterType(ftype=Any)
+        Set item filter type.
+    filterAcceptsRow(sourceRow=int, sourceParent=QModelIndex)
+        Return True or False if either item was accepted or rejected.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._ftype = None
+
+    def filterType(self) -> int:
+        """
+        Return item filter type.
+        """
+        return self._ftype
+
+    def setFilterType(self, ftype: Optional[int] = None):
+        """
+        Set item filter type.
+        """
+        self._ftype = ftype
+        self.invalidateFilter()
+
+    def filterAcceptsRow(
+        self, sourceRow: int, sourceParent: QModelIndex
+    ) -> bool:
+        """Return True or False if either item was accepted or rejected.
+
+        Returns True if the item in the row indicated by the given source_row and
+        source_parent should be included in the model; otherwise returns False.
+        """
+        item = self.sourceModel().item(sourceRow, 0)
+        return item.type() != self._ftype

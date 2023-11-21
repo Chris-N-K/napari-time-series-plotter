@@ -4,7 +4,7 @@ import numpy as np
 from napari_matplotlib.base import NapariMPLWidget
 from qtpy import QtCore, QtWidgets
 
-from .models import LayerSelectionModel
+from .models import ItemTypeFilterProxyModel, LayerSelectionModel
 from .utils import (
     extract_ROI_time_series,
     extract_voxel_time_series,
@@ -28,9 +28,13 @@ class LayerSelector(QtWidgets.QTreeView):
     def __init__(self, napari_viewer, parent=None):
         super().__init__(parent)
         self.setObjectName("LayerSelector")
-        self.setModel(LayerSelectionModel(napari_viewer.layers))
+        self.source_model = LayerSelectionModel(napari_viewer)
+        filter_model = ItemTypeFilterProxyModel()
+        filter_model.setSourceModel(self.source_model)
+        filter_model.setFilterType(1003)
+        self.setModel(filter_model)
         self.setHeaderHidden(True)
-        self.setFixedHeight(100)
+        self.setFixedHeight(150)
         self.setSizePolicy(
             QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred
         )
@@ -231,7 +235,7 @@ class VoxelPlotter(NapariMPLWidget):
         """
         Overwrite the layers attribute with the currently checked items in the selector model and re-draw.
         """
-        self.layers = self.selector.model().selectedLayers()
+        self.layers = []  # self.selector.model().selectedLayers()
         self._draw()
 
     def update_options(self, options_dict: dict):
