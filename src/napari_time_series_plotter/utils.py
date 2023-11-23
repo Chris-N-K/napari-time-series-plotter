@@ -53,6 +53,7 @@ def to_layer_space(data, layer):
 
     Data array must contain the points in dim 0 and the
     coordinates per dimension in dim 1.
+    Points exceeding the boundaries of layer are omitted.
 
     Paramaeters
     -----------
@@ -68,7 +69,14 @@ def to_layer_space(data, layer):
     if data.size != 0:
         idx = np.concatenate([[True], ~np.all(data[1:] == data[:-1], axis=-1)])
         tdata = layer._transforms[1:].simplified.inverse(data[idx].copy())
-        return tdata
+        valid = np.where(
+            np.all((tdata >= 0) & (tdata <= layer.data.shape), axis=0)
+        )
+        vtdata = tdata[valid]
+        if vtdata.size == 0:
+            return np.empty_like(data)
+        else:
+            return vtdata
     return data
 
 
