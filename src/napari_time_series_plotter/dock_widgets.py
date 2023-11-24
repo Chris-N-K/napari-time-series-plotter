@@ -12,12 +12,13 @@ Non image layers or layers with more ore less dimensions will be ignored by the 
 The widgets are send to the viewer through the ``napari_experimental_provide_dock_widget`` hook specification.
 see: https://napari.org/docs/dev/plugins/hook_specifications.html
 """
-import typing
+
+from typing import Optional
 
 from qtpy import QtCore, QtWidgets
 
-from .models import TimeSeriesTableModel
-from .widgets import LayerSelector, OptionsManager, VoxelPlotter
+from .models import LayerSelectionModel
+from .widgets import LayerSelector, OptionsManager, TimeSeriesMPLWidget
 
 __all__ = ("TSPExplorer", "TSPInspector")
 
@@ -35,22 +36,28 @@ class TSPExplorer(QtWidgets.QWidget):
     """
 
     def __init__(
-        self, napari_viewer, parent: typing.Optional[QtWidgets.QWidget] = None
+        self, napari_viewer, parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
         super().__init__(parent)
+        self._napari_viewer = napari_viewer
 
+        self._initUI()
+        self._connectEvents()
+
+    def _initUI(self):
         # subwidgets
         self.tabs = QtWidgets.QTabWidget()
-        self.selector = LayerSelector(napari_viewer)
         self.options = OptionsManager()
-        self.plotter = VoxelPlotter(
-            napari_viewer, self.selector, self.options.plotter_options()
+        self.model = LayerSelectionModel(
+            self._napari_viewer,
+            agg_func=self.options.plotter_options()["roi_mode"],
+        )
+        self.selector = LayerSelector(self.model)
+        self.plotter = TimeSeriesMPLWidget(
+            self._napari_viewer, self.model, self.options.plotter_options()
         )
         self.tabs.addTab(self.plotter, "Plot")
         self.tabs.addTab(self.options, "Options")
-
-        # data models
-        self.datatable = TimeSeriesTableModel(self.plotter)
 
         # layout
         layout = QtWidgets.QVBoxLayout()
@@ -59,10 +66,16 @@ class TSPExplorer(QtWidgets.QWidget):
         layout.addWidget(self.selector)
         self.setLayout(layout)
 
+    def _connectEvents(self):
         # handle events
-        self.selector.model().itemChanged.connect(self.plotter.update_layers)
+        # self.selector.model().dataChanged.connect(self.plotter.update_layers)
         self.options.plotter_option_changed.connect(
             self.plotter.update_options
+        )
+        self.options.plotter_option_changed.connect(
+            lambda options: self.selector.source_model.setAggFunc(
+                options["roi_mode"]
+            )
         )
 
 
@@ -82,7 +95,7 @@ class TSPInspector(QtWidgets.QWidget):
     dataChanged = QtCore.Signal()
 
     def __init__(
-        self, napari_viewer, parent: typing.Optional[QtWidgets.QWidget] = None
+        self, napari_viewer, parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
         super().__init__(parent)
         self.viewer = napari_viewer

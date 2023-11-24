@@ -1,34 +1,52 @@
-from warnings import warn
+from typing import (
+    Any,
+    Dict,
+    Optional,
+    Union,
+)
 
+import matplotlib.style as mplstyle
+import napari
 import numpy as np
-from napari_matplotlib.base import NapariMPLWidget
+from matplotlib.lines import Line2D
+from matplotlib.text import Annotation
+from napari_matplotlib.base import BaseNapariMPLWidget
 from qtpy import QtCore, QtWidgets
 
 from .models import ItemTypeFilterProxyModel, LayerSelectionModel
-from .utils import (
-    extract_ROI_time_series,
-    extract_voxel_time_series,
-)
 
-__all__ = ("LayerSelector", "VoxelPlotter", "OptionsManager")
+__all__ = ("LayerSelector", "TimeSeriesMPLWidget", "OptionsManager")
 
 
 class LayerSelector(QtWidgets.QTreeView):
-    """Subclass of QListView for selection of 3D/4D napari image layers.
+    """Tree view for selection of source and selection layers.
 
-    This widget contains a list of all 4D images layer currently in the napari viewer layers list. All items have a
-    checkbox for selection. It is not meant to be directly docked to the napari viewer, but needs a napari viewer
-    instance to work.
+    This view shows a tree structure of all valid source layers (images > 2D) and
+    their matching selection layers (points and shapes layers of matching dimensions).
+    The selection layers are child items of the source layers. Users can check the
+    layers they want to select.
 
-    Attributes:
-        napari_viewer : napari.Viewer
-        parent : Qt parent widget / window, default None
+    Parameters
+    ----------
+    model : LayerSelectionModel
+        Model instance holding layer items to display.
+    parent : Optional[qtpy.QtWidgets.QWidget]
+        Parent widget.
+
+    Attributes
+    ----------
+    source_model : LayerSelectionModel
+        Model instance holding layer items to display.
     """
 
-    def __init__(self, napari_viewer, parent=None):
+    def __init__(
+        self,
+        model: LayerSelectionModel,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ):
         super().__init__(parent)
         self.setObjectName("LayerSelector")
-        self.source_model = LayerSelectionModel(napari_viewer)
+        self.source_model = model
         filter_model = ItemTypeFilterProxyModel()
         filter_model.setSourceModel(self.source_model)
         filter_model.setFilterType(1003)
@@ -41,153 +59,189 @@ class LayerSelector(QtWidgets.QTreeView):
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
 
-class VoxelPlotter(NapariMPLWidget):
-    """Subclass of napari_matplotlib NapariMPLWidget for voxel position based time series plotting.
+class TimeSeriesMPLWidget(BaseNapariMPLWidget):
+    """Widget for time series plotting.
 
-    This widget contains a matplotlib figure canvas for plot visualisation and the matplotlib toolbar for easy option
-    controls. The widget is not meant for direct docking to the napari viewer.
-    Plot visualisation is triggered by moving the mouse cursor over the voxels of an image layer while holding the shift
-    key. The first dimension is handled as time. This widget needs a napari viewer instance and a LayerSelector instance
-    to work properly.
+    The widget can plot the time series data provided through a LayerSelectionModel
+    or an info text explaining the usage of the napari-time-series-plotter plugin.
 
-    Attributes:
-        axes : matplotlib.axes.Axes
-        selector : napari_time_series_plotter.LayerSelector
-        cursor_pos : tuple of current mouse cursor position in the napari viewer
-        autoscale : bool, to autoscale if true or if x/y lim are empty
-        x_lim : tuple, min and max value for x axis (only if autoscale false)
-        y_lim : tuple, min and max value for y axis (only if autoscale false)
-        max_label_len : maximal length of labels in the figure legend
-        mode : plotting mode (Voxel, Shapes, Points)
-        roi_mode : ROI value calculation mode for Shapes plotting mode
+    Parameters
+    ----------
+    napari_viewer : napari.Viewer
+        Main napari viewer.
+    model : LayerSelectionModel
+        Model instance holding layer and time series data.
+    options : Optional[Dict[str, Any]]
+        Dictionary conatining plotting parameters.
+    parent : Optional[qtpy.QtWidgets.QWidget]
+        Parent widget.
+
+    Attributes
+    ----------
+    _model : LayerSelectionModel
+        Model instance holding layer and time series data.
+    _plots : Dict[str, Line2D]
+        Dictionary of current plots.
+    _info_text : None | Annotation
+        Annotation object if info text is displayed, else None.
+    title_text : str | None
+        Figure title, if None show no title.
+    xaxis_label : str | None
+        X axis label, if None show no label.
+    yaxis_label : str | None
+        Y axis label, if None show no label.
+    x_lim : Tuple of int or None
+        Tuple of x axis limits, if both are None do autoscaling.
+    y_lim : Tuple of int or None
+        Tuple of y axis limits, if both are None do autoscaling.
+    truncate_labels : bool
+        If True truncate plot labels.
+    xscale : float
+        X axis sclaing value.
+    roi_mode : str
+        Roi mode code, one of max, mean, median, min, std, sum.
+    textcolor : str
+        Color for annotation text as hex code.
+
+    Methods
+    -------
+    _on_napari_theme_changed()
+        Callback for theme change.
+    _draw(*args)
+        Wrapper for events with return values to trigger the draw() method.
+    clear()
+        Clear the canvas and show info text.
+    draw()
+        Draw time series plots  or info text on the canvas.
+    update_options(options_dict=Dict[str, Any])
+        Update plott parameters (attributes) based on input.
     """
 
-    def __init__(self, napari_viewer, selector, options=None):
-        super().__init__(napari_viewer)
-        self.selector = selector
-        self.cursor_pos = np.array([])
-        self.selection_layer = None
-        self.axes = self.canvas.figure.subplots()
+    def __init__(
+        self,
+        napari_viewer: napari.Viewer,
+        model: LayerSelectionModel,
+        options: Optional[Dict[str, Any]] = None,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ) -> None:
+        super().__init__(napari_viewer=napari_viewer, parent=parent)
+        self._model = model
+        self._plots: Dict[str, Line2D] = {}
+        self._info_text: Union[None, Annotation] = None
+
+        self.add_single_axes()
         if options:
             self.update_options(options)
         else:
             self.title_text = None
             self.xaxis_label = "Time"
             self.yaxis_label = "Intensity"
-            self.autoscale = True
-            self.x_lim = (None, None)
-            self.y_lim = (None, None)
-            self.max_label_len = None
+            self.x_bounds = (None, None)
+            self.y_bounds = (None, None)
+            self.truncate_labels = False
             self.xscale = 1
-            self.mode = "Voxel"
             self.roi_mode = "Mean"
-        self.update_layers(None)
+            self.draw()
 
-    def clear(self):
+        self._model.dataChanged.connect(self._draw)
+
+    def _on_napari_theme_changed(self) -> None:
+        """Update MPL toolbar and redraw canvas when `napari.Viewer.theme` is changed.
+
+        At the moment only handle the default 'light' and 'dark' napari themes are handled.
         """
-        Clear the canvas.
+        super()._on_napari_theme_changed()
+        self.draw()
+
+    def _draw(self, *args) -> None:
         """
-        self.axes.clear()
-
-    def draw(self):
-        """Draw intensity over time line plots for the selected voxel(s) or ROI(s) of all layers in the layer attribute.
-
-        The plotting mode is handled via the mode attribute. Three modes are available voxel, shapes (ROIs) and points (multiple voxels).
-        In the voxel plotting mode the voxel is selected through the current cursor_pos value, in shapes and points plotting mode the selection
-        is based on an selection layer. The first dimension is handled as time.
+        Wrapper for events with return values to trigger the self.draw().
         """
-        handles = []
+        self.draw()
 
-        if self.layers:
-            for layer in self.layers:
-                # get layer data
-                if self.max_label_len:
-                    lname = layer.name[slice(self.max_label_len)]
+    @property
+    def textcolor(self) -> str:
+        """
+        Color for annotation text as hex code.
+        """
+        return napari.utils.theme.get_theme(
+            self.viewer.theme,
+            as_dict=False,
+        ).text.as_hex()
+
+    def clear(self) -> None:
+        """
+        Clear the canvas and show info text.
+        """
+        with mplstyle.context(self.mpl_style_sheet_path):
+            self.axes.clear()
+            self._info_text = self.axes.annotate(
+                "Select source (image) and selection layers (points, shapes)\nto plot time series or\nmove the mouse over the canvas while holding 'shift'\nto live plotting selected source layers.",
+                (0.5, 0.5),
+                ha="center",
+                va="center",
+                size=12,
+                color=self.textcolor,
+            )
+            self.axes.tick_params(
+                axis="both",  # changes apply to both axes
+                which="both",  # both major and minor ticks are affected
+                bottom=False,  # ticks along the bottom edge are off
+                top=False,  # ticks along the top edge are off
+                labelbottom=False,
+                left=False,
+                right=False,
+                labelleft=False,
+            )
+            self.figure.tight_layout()
+            self.canvas.draw_idle()
+
+    def draw(self) -> None:
+        """Draw time series plots  or info text on the canvas.
+
+        The ts data provided through self._model is plotted as line graphs. If the model
+        does not provide any ts data an info text is plotted instead.
+        The generated line graphs are stored under in a dictionary self._plots with
+        the ts identifiers as keys. If the identifiers or data in the ts data differ from
+        the identifiers or data in self._plots only the involved line plots are upated.
+        """
+        data = self._model.tsData
+        if data:
+            # compare plot and data keys to know which plots to modify, remove or add
+            plot_keys = set(self._plots)
+            data_keys = set(data)
+            to_check = plot_keys & data_keys
+            to_remove = plot_keys.difference(data_keys)
+            to_add = data_keys.difference(plot_keys)
+
+            # for consistent keys check if the data changed
+            for key in to_check:
+                plot = self._plots[key]
+                ts = data[key]
+                px, py = plot.get_data()
+                if self.truncate_labels and not key.startswith("LivePlot"):
+                    label = f"{key[:11]}...{key[-8:]}"
                 else:
-                    lname = layer.name
+                    label = key
+                plot.set_label(label)
+                if ~np.array_equal(py, ts):
+                    plot.set_data(px, ts)
 
-                # plot voxel / pixel time series
-                if self.mode == "Voxel" and self.cursor_pos.size != 0:
-                    # extract voxel time series
-                    vidx, vts = extract_voxel_time_series(
-                        self.cursor_pos, layer, self.xscale
-                    )
-                    # add graph
-                    if not isinstance(vts, type(None)):
-                        handles.extend(
-                            self.axes.plot(
-                                vts[0], vts[1], label=f"{lname}-{vidx[1:]}"
-                            )
-                        )
+            # remove graphs and plot entry if the ts data no longer excists
+            for key in to_remove:
+                self._plots.pop(key).remove()
 
-                # plot roi_mode value from square ROI(s) in shape layers
-                elif (
-                    self.selection_layer and len(self.selection_layer.data) > 0
-                ):
-                    if self.mode == "Shapes":
-                        if np.any(layer.translate) or np.any(
-                            [x != 1 for x in layer.scale]
-                        ):
-                            # TODO: We have to wait for the translate and scale support on napari side
-                            warn(
-                                "ROI plotting does not support layers with translate or scale values!\n"
-                                f"Skiped layer: {layer.name}"
-                            )
-                        else:
-                            # convert shape to 2d labels to be used later for the mask
-                            labels = self.selection_layer.to_labels(
-                                layer.data.shape[-2:]
-                            )
-                            # iterate over ROIs in shapes layer
-                            for idx_shape in range(
-                                self.selection_layer.nshapes
-                            ):
-                                # calculate finally the roi_mode value
-                                roi_ts = extract_ROI_time_series(
-                                    self.viewer.dims.current_step,
-                                    layer,
-                                    labels,
-                                    idx_shape,
-                                    self.roi_mode,
-                                    self.xscale,
-                                )
-                                if not isinstance(roi_ts, type(None)):
-                                    # add graph
-                                    handles.extend(
-                                        self.axes.plot(
-                                            roi_ts[0],
-                                            roi_ts[1],
-                                            label=f"{lname}_ROI-{idx_shape}",
-                                        )
-                                    )
-                    elif self.mode == "Points":
-                        for idx_point, point in enumerate(
-                            self.selection_layer.data
-                        ):
-                            # extract voxel time series for each point
-                            vidx, vts = extract_voxel_time_series(
-                                point, layer, self.xscale
-                            )
-                            # add graph
-                            if not isinstance(vts, type(None)):
-                                handles.extend(
-                                    self.axes.plot(
-                                        vts[0],
-                                        vts[1],
-                                        label=f"{lname}_P{idx_point}-{vidx[1:]}",
-                                    )
-                                )
+            # add a graph for new ts data
+            for key in to_add:
+                if self.truncate_labels and not key.startswith("LivePlot"):
+                    label = f"{key[:11]}...{key[-8:]}"
+                else:
+                    label = key
+                self._plots[key] = self.axes.plot(data[key], label=label)[0]
 
-        if handles:
-            title_dict = {
-                "Voxel": "",
-                "Shapes": f"{self.roi_mode} ROI mode",
-                "Points": "Points mode",
-            }
+            # set axe options
             if self.title_text:
                 self.axes.set_title(self.title_text)
-            elif title_dict[self.mode]:
-                self.axes.set_title(title_dict[self.mode])
             self.axes.tick_params(
                 axis="both",  # changes apply to both axes
                 which="both",  # both major and minor ticks are affected
@@ -200,45 +254,28 @@ class VoxelPlotter(NapariMPLWidget):
             )
             self.axes.set_xlabel(self.xaxis_label)
             self.axes.set_ylabel(self.yaxis_label)
-            if not self.autoscale:
-                self.axes.set_xlim(self.x_lim)
-                self.axes.set_ylim(self.y_lim)
+
             self.axes.legend(
-                loc="center left", bbox_to_anchor=(1, 0.3)
+                loc="upper right",
             ).set_draggable(True)
-            self.canvas.figure.tight_layout()
-        else:  # if there are no graphs to display show info text
-            info_dict = {
-                "Voxel": 'Hold "Shift" while moving the cursor\nover a selected layer\nto plot pixel / voxel time series.',
-                "Shapes": 'Add a shape to the "ROI selection" layer\nand move it over the image\nto plot the ROI time series.',
-                "Points": 'Add points to the "Voxel selection" layer\nto plot the time series at each point.',
-            }
-            self.axes.annotate(
-                info_dict[self.mode],
-                (0.5, 0.5),
-                ha="center",
-                va="center",
-                size=15,
-            )
-            self.axes.tick_params(
-                axis="both",  # changes apply to both axes
-                which="both",  # both major and minor ticks are affected
-                bottom=False,  # ticks along the bottom edge are off
-                top=False,  # ticks along the top edge are off
-                labelbottom=False,
-                left=False,
-                right=False,
-                labelleft=False,
-            )
 
-    def update_layers(self, event):
-        """
-        Overwrite the layers attribute with the currently checked items in the selector model and re-draw.
-        """
-        self.layers = []  # self.selector.model().selectedLayers()
-        self._draw()
+            self.axes.relim()
+            self.axes.autoscale_view(tight=False, scalex=True, scaley=True)
+            self.axes.set_xbound(*self.x_bounds)
+            self.axes.set_ybound(*self.y_bounds)
 
-    def update_options(self, options_dict: dict):
+            # remove info text
+            if self._info_text is not None:
+                self._info_text = self._info_text.remove()
+
+            self.figure.tight_layout()
+            self.canvas.draw_idle()
+        else:
+            # if no ts data clear plot dict and show info text in canvas
+            self._plots = {}
+            self.clear()
+
+    def update_options(self, options_dict: Dict[str, Any]) -> None:
         """Update attributes based on input.
         After setting the attributes to new values the 'set_mode' and '_draw' methods are called to compute changes.
 
@@ -247,120 +284,12 @@ class VoxelPlotter(NapariMPLWidget):
         self.title_text = options_dict["title_text"]
         self.xaxis_label = options_dict["xaxis_label"]
         self.yaxis_label = options_dict["yaxis_label"]
-        self.autoscale = options_dict["autoscale"]
-        self.x_lim = options_dict["x_lim"]
-        self.y_lim = options_dict["y_lim"]
-        if options_dict["truncate"]:
-            self.max_label_len = options_dict["trunc_len"]
-        else:
-            self.max_label_len = None
+        self.x_bounds = options_dict["x_bounds"]
+        self.y_bounds = options_dict["y_bounds"]
+        self.truncate_labels = options_dict["truncate"]
         self.xscale = options_dict["xscale"]
-        # call to process changes
-        self.set_mode(options_dict["mode"])
         self.roi_mode = options_dict["roi_mode"]
-        self._draw()
-
-    def set_mode(self, mode: str):
-        """Set the plotting mode to input.
-        For the three available plotting modes different functions and layers are needed, this method activates activates them based on the
-        input string in 'mode'.
-
-        :param mode: Mode name ['Voxel', 'Shapes', 'Points']
-        """
-        self.mode = mode
-        if mode == "Voxel":
-            if self._remove_selection_layer():
-                self.cursor_pos = np.array([])
-        else:
-            if mode == "Shapes" and "ROI selection" not in self.viewer.layers:
-                if (
-                    self.selection_layer
-                ):  # remove voxel selection layer if present
-                    self._remove_selection_layer()
-                # TODO: improve support of nD layers --> add shapes layer with dims matching biggest image, automatic dim modification
-                self.selection_layer = self.viewer.add_shapes(
-                    data=None, face_color="transparent", name="ROI selection"
-                )
-                self.selection_layer.events.data.connect(
-                    self._data_changed_callback
-                )
-            elif (
-                mode == "Points"
-                and "Voxel selection" not in self.viewer.layers
-            ):
-                if (
-                    self.selection_layer
-                ):  # remove shapes selection layer if present
-                    self._remove_selection_layer()
-                # TODO: improve support of nD layers --> add automatic point layer dimension modification to fit the max dim
-                self.selection_layer = self.viewer.add_points(
-                    data=None, size=1, name="Voxel selection", ndim=4
-                )
-                self.selection_layer.events.data.connect(
-                    self._data_changed_callback
-                )
-
-    def setup_callbacks(self):
-        """
-        Setup callbacks for:
-         - mouse move inside of the napari viewer
-         - dim step changes
-        """
-        self.viewer.mouse_move_callbacks.append(self._shift_move_callback)
-        self.viewer.dims.events.current_step.connect(self._draw)
-
-        # BUG: disabled, the re-adding of a layer based on the removed signal causes errors
-        # self.viewer.layers.events.removed.connect(self._guard_selection_layer_callback)
-
-    def _shift_move_callback(self, viewer, event):
-        """Receiver for napari.viewer.mouse_move_callbacks, checks for 'Shift' event modifier.
-
-        If event contains 'Shift' and layer attribute contains napari layers the cursor position is written to the
-        cursor_pos attribute and the _draw method is called afterwards.
-        """
-        if "Shift" in event.modifiers and self.layers:
-            self.cursor_pos = np.round(viewer.cursor.position)
-            self._draw()
-
-    def _data_changed_callback(self, event):
-        """
-        Redraw plot if data changed.
-        Compatibility wrapper, to accpet event value.
-        """
-        self._draw()
-
-    # BUG: disabled, causes errors
-    # def _guard_selection_layer_callback(self, event):
-    #    """
-    #    Readd the selection layer when removed despite still in corresponding mode.
-    #    """
-    #    if event.value == self.selection_layer:
-    #        self.viewer.add_layer(event.value)
-
-    def _remove_selection_layer(self):
-        """
-        Safely remove selection_layer from the viewer and set the attribute to None.
-        """
-        if self.selection_layer:
-            tmp = self.selection_layer
-            self.selection_layer = None
-            self.viewer.layers.remove(tmp)
-            return True
-        return False
-
-    @property
-    def data(self):
-        """Get the currently plotted data.
-
-        Returns
-        ------
-        dict
-            Dictionary of plot labels as keys and lists of y data points as values.
-        """
-        return {
-            plot.get_label(): plot.get_data()[1]
-            for plot in self.axes.get_lines()
-        }
+        self.draw()
 
 
 class OptionsManager(QtWidgets.QWidget):
@@ -369,16 +298,45 @@ class OptionsManager(QtWidgets.QWidget):
     This widget displayes the current option values. The user is able to modify them and each change will trigger the
     plotter_options_changed signal. The plotter_options_changed signal sends the current options in form of a dictionary.
 
-    Options:
-    - cb_autoscale -> checkbox, do figure axes auto scale, default true
-    - le_autoscale_x_min -> line edit, x axis min value (only if cb_autoscale false)
-    - le_autoscale_x_max -> line edit, x axis max value (only if cb_autoscale false)
-    - le_autoscale_y_min -> line edit, y axis min value (only if cb_autoscale false)
-    - le_autoscale_y_max -> line edit, y axis max value (only if cb_autoscale false)
-    - cb_trunc -> checkbox, truncate layer names in legend, default false
-    - le_trunc -> max layer name length in legend (only if cb_trunc true)
-    - mode -> combobox, plotting mode selection (Voxel, Shapes, Points), default Voxel
-    - roi_mode -> combobox, roi calculation mode selection (mean, median, sum, std)
+    Attributes
+    ----------
+    _roi_modes : Dict[str, Callable]
+        Dictinary containg roi aggregation functions and their identifiers.
+    label_axe_options : qtpy.QtWidgets.QLabel
+        Title for the axe options.
+    title_text : qtpy.QtWidgets.QLineEdit
+        User editable lineedit, defines the figure title.
+    xaxis_label : qtpy.QtWidgets.QLineEdit
+        User editable lineedit, defines the x axis label.
+    yaxis_label : qtpy.QtWidgets.QLineEdit
+        User editable lineedit, defines the y axis label.
+    label_x_bounds : qtpy.QtWidgets.QLabel
+        Label for x axis bounds lineedits.
+    x_min : qtpy.QtWidgets.QLineEdit
+        User editable lineedit, defines the x axis lower end.
+    x_max : qtpy.QtWidgets.QLineEdit
+        User editable lineedit, defines the x axis upper end.
+    label_y_bounds : qtpy.QtWidgets.QLabel
+        Label for y axis bounds lineedits.
+    y_min : qtpy.QtWidgets.QLineEdit
+        User editable lineedit, defines the y axis lower end.
+    y_min : qtpy.QtWidgets.QLineEdit
+        User editable lineedit, defines the y axis upper end.
+    label_plot_options : qtpy.QtWidgets.QLabel
+        Title for the plot options.
+    cb_trunc : qtpy.QtWidgets.QCheckBox
+        User editable checkbox, if checked do label truncation in the figure legend.
+    xscale : qtpy.QtWidgets.QLineEdit
+        User editable lineedit, defines the x axis scaling factor.
+    roi_mode : qtpy.QtWidgets.QComboBox
+        Combobox containing all selectable roi aggregation modes.
+
+    Methods
+    -------
+    poc_callback()
+        Callback for option value changes, emits signal with plotter_optons() as value.
+    plotter_options()
+        Return dictionary with current plotting option values.
     """
 
     # signals
@@ -386,6 +344,14 @@ class OptionsManager(QtWidgets.QWidget):
 
     def __init__(self):
         super().__init__()
+        self._roi_modes = {
+            "max": np.max,
+            "mean": np.mean,
+            "median": np.median,
+            "min": np.min,
+            "sum": np.sum,
+            "std": np.std,
+        }
         # subwidgets
         self.label_axe_options = QtWidgets.QLabel("Axe Options")
         self.label_axe_options.setStyleSheet(
@@ -396,12 +362,12 @@ class OptionsManager(QtWidgets.QWidget):
         self.xaxis_label.setText("Time")
         self.yaxis_label = QtWidgets.QLineEdit()
         self.yaxis_label.setText("Intensity")
-        self.cb_autoscale = QtWidgets.QCheckBox()
-        self.cb_autoscale.setChecked(True)
-        self.le_autoscale_x_min = QtWidgets.QLineEdit()
-        self.le_autoscale_x_max = QtWidgets.QLineEdit()
-        self.le_autoscale_y_min = QtWidgets.QLineEdit()
-        self.le_autoscale_y_max = QtWidgets.QLineEdit()
+        self.label_x_bounds = QtWidgets.QLabel("X axis bounds")
+        self.x_min = QtWidgets.QLineEdit()
+        self.x_max = QtWidgets.QLineEdit()
+        self.label_y_bounds = QtWidgets.QLabel("Y axis bounds")
+        self.y_min = QtWidgets.QLineEdit()
+        self.y_max = QtWidgets.QLineEdit()
 
         self.label_plot_options = QtWidgets.QLabel("Plot Options")
         self.label_plot_options.setStyleSheet(
@@ -409,28 +375,23 @@ class OptionsManager(QtWidgets.QWidget):
         )
         self.cb_trunc = QtWidgets.QCheckBox()
         self.cb_trunc.setChecked(False)
-        self.le_trunc = QtWidgets.QLineEdit()
         self.xscale = QtWidgets.QLineEdit()
         self.xscale.setText("1")
-        self.mode = QtWidgets.QComboBox()
-        self.mode.addItems(["Voxel", "Shapes", "Points"])
         self.roi_mode = QtWidgets.QComboBox()
-        self.roi_mode.addItems(["Mean", "Median", "Std", "Min", "Max", "Sum"])
+        self.roi_mode.addItems(["max", "mean", "median", "min", "std", "sum"])
+        self.roi_mode.setCurrentIndex(2)
 
         # connect callbacks for option changes
         self.title_text.editingFinished.connect(self.poc_callback)
         self.xaxis_label.editingFinished.connect(self.poc_callback)
         self.yaxis_label.editingFinished.connect(self.poc_callback)
-        self.cb_autoscale.stateChanged.connect(self.poc_callback)
-        self.le_autoscale_x_min.editingFinished.connect(self.poc_callback)
-        self.le_autoscale_x_max.editingFinished.connect(self.poc_callback)
-        self.le_autoscale_y_min.editingFinished.connect(self.poc_callback)
-        self.le_autoscale_y_max.editingFinished.connect(self.poc_callback)
+        self.x_min.editingFinished.connect(self.poc_callback)
+        self.x_max.editingFinished.connect(self.poc_callback)
+        self.y_min.editingFinished.connect(self.poc_callback)
+        self.y_max.editingFinished.connect(self.poc_callback)
 
         self.cb_trunc.stateChanged.connect(self.poc_callback)
-        self.le_trunc.editingFinished.connect(self.poc_callback)
         self.xscale.editingFinished.connect(self.poc_callback)
-        self.mode.currentIndexChanged.connect(self.poc_callback)
         self.roi_mode.currentIndexChanged.connect(self.poc_callback)
 
         # layout
@@ -439,16 +400,19 @@ class OptionsManager(QtWidgets.QWidget):
         layout.addRow("Plot title", self.title_text)
         layout.addRow("X-axis label", self.xaxis_label)
         layout.addRow("Y-axis label", self.yaxis_label)
-        layout.addRow("Auto scale plot axes", self.cb_autoscale)
-        layout.addRow("x_min", self.le_autoscale_x_min)
-        layout.addRow("x_max", self.le_autoscale_x_max)
-        layout.addRow("y_min", self.le_autoscale_y_min)
-        layout.addRow("y_max", self.le_autoscale_y_max)
+        hbox = QtWidgets.QHBoxLayout()
+        hbox.addWidget(self.label_x_bounds)
+        hbox.addWidget(self.x_min)
+        hbox.addWidget(self.x_max)
+        layout.addRow(hbox)
+        hbox = QtWidgets.QHBoxLayout()
+        hbox.addWidget(self.label_y_bounds)
+        hbox.addWidget(self.y_min)
+        hbox.addWidget(self.y_max)
+        layout.addRow(hbox)
         layout.addRow(self.label_plot_options)
         layout.addRow("Truncate layer names", self.cb_trunc)
-        layout.addRow("Layer name length", self.le_trunc)
         layout.addRow("Scaling factor X-axis", self.xscale)
-        layout.addRow("Plotting mode", self.mode)
         layout.addRow("ROI plotting mode", self.roi_mode)
         self.setLayout(layout)
 
@@ -468,28 +432,15 @@ class OptionsManager(QtWidgets.QWidget):
             else None,
             "xaxis_label": self.xaxis_label.text(),
             "yaxis_label": self.yaxis_label.text(),
-            "autoscale": self.cb_autoscale.isChecked(),
-            "x_lim": (
-                float(self.le_autoscale_x_min.text())
-                if self.le_autoscale_x_min.text()
-                else None,
-                float(self.le_autoscale_x_max.text())
-                if self.le_autoscale_x_max.text()
-                else None,
+            "x_bounds": (
+                float(self.x_min.text()) if self.x_min.text() else None,
+                float(self.x_max.text()) if self.x_max.text() else None,
             ),
-            "y_lim": (
-                float(self.le_autoscale_y_min.text())
-                if self.le_autoscale_y_min.text()
-                else None,
-                float(self.le_autoscale_y_max.text())
-                if self.le_autoscale_y_max.text()
-                else None,
+            "y_bounds": (
+                float(self.y_min.text()) if self.y_min.text() else None,
+                float(self.y_max.text()) if self.y_max.text() else None,
             ),
             "xscale": float(self.xscale.text()),
             "truncate": self.cb_trunc.isChecked(),
-            "trunc_len": int(self.le_trunc.text())
-            if self.le_trunc.text()
-            else None,
-            "mode": self.mode.currentText(),
-            "roi_mode": self.roi_mode.currentText(),
+            "roi_mode": self._roi_modes[self.roi_mode.currentText()],
         }

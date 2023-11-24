@@ -70,11 +70,11 @@ def to_layer_space(data, layer):
         idx = np.concatenate([[True], ~np.all(data[1:] == data[:-1], axis=-1)])
         tdata = layer._transforms[1:].simplified.inverse(data[idx].copy())
         valid = np.where(
-            np.all((tdata >= 0) & (tdata <= layer.data.shape), axis=0)
+            np.all((tdata >= 0) & (tdata < layer.data.shape), axis=1)
         )
         vtdata = tdata[valid]
         if vtdata.size == 0:
-            return np.empty_like(data)
+            return np.array([])
         else:
             return vtdata
     return data
@@ -105,8 +105,11 @@ def points_to_ts_indices(points: npt.NDArray, layer) -> List[Tuple[Any, ...]]:
             f"Dimensionality of position ({ndim}) must not be smaller then dimensionality of layer ({layer.ndim}) -1."
         )
 
-    tpoints = np.round(to_layer_space(points, layer)).astype(int)
-    indices = [(slice(None), *p[1:]) for p in tpoints]
+    tpoints = np.floor(to_layer_space(points, layer)).astype(int)
+    if tpoints.size != 0:
+        indices = [(slice(None), *p[1:]) for p in tpoints]
+    else:
+        indices = []
     return indices
 
 
@@ -141,6 +144,8 @@ def shape_to_ts_indices(
 
     # remove duplicates and transform to layer space
     data = to_layer_space(data, layer)
+    if data.size == 0:
+        return ()
 
     # determine vertices
     if ellipsis:
@@ -170,7 +175,6 @@ def shape_to_ts_indices(
             raise ValueError(
                 "All vertices of a shape must be in a single y/x plane."
             )
-
     return (slice(None),) + indices
 
 
