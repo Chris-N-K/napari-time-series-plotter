@@ -3,14 +3,14 @@ display_name: TSP
 schema_version: 0.1.0
 contributions:
   commands:
-    - id: napari-time-series-plotter.Explorer
-      title: Dock TSPExplorer widget
-      python_name: napari_time_series_plotter.dock_widgets:TSPExplorer
-    - id: napari-time-series-plotter.Inspector
-      title: Dock TSPInspector widget
-      python_name: napari_time_series_plotter.dock_widgets:TSPInspector
+    - id: napari-time-series-plotter.TimeSeriesExplorer
+      title: TimeSeriesExplorer
+      python_name: napari_time_series_plotter.dock_widgets:TimeSeriesExplorer
+    - id: napari-time-series-plotter.TimeSeriesTableView
+      title: TimeSeriesTableView
+      python_name: napari_time_series_plotter.dock_widgets:TimeSeriesTableView
   widgets:
-    - command: napari-time-series-plotter.Explorer
-      display_name: Explorer
-    - command: napari-time-series-plotter.Inspector
-      display_name: Inspector
+    - command: napari-time-series-plotter.TimeSeriesExplorer
+      display_name: TimeSeriesExplorer
+    - command: napari-time-series-plotter.TimeSeriesTableView
+      display_name: TimeSeriesTableView

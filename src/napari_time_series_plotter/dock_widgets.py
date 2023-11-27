@@ -1,123 +1,156 @@
 """
-This module is a QWidget plugin for napari.
-
-The plugin is made of two subunits the LayerSelector and VoxelPlotter widget.
-Together they give the user the ability to select 3D or 4D image layers in the viewer and plot voxel values.
-The VoxelPlotter visualises the values of a voxel along the first axis as a graph. If multiple layers are selected
-multiple graphs are plotted to the same figure, docked to the viewer. The user selects the voxel by hovering with the
-mouse over it while holding shift.
-
-Non image layers or layers with more ore less dimensions will be ignored by the LayerSelector.
-
-The widgets are send to the viewer through the ``napari_experimental_provide_dock_widget`` hook specification.
-see: https://napari.org/docs/dev/plugins/hook_specifications.html
+This module contains the dock widgets of napari-time-series-plotter.
 """
-
 from typing import Optional
 
+from napari import Viewer
 from qtpy import QtCore, QtWidgets
 
-from .models import LayerSelectionModel
+from .models import LayerSelectionModel, TimeSeriesTableModel
 from .widgets import LayerSelector, OptionsManager, TimeSeriesMPLWidget
 
-__all__ = ("TSPExplorer", "TSPInspector")
 
-# TODO: TSPExplorer besseren namen finden
-class TSPExplorer(QtWidgets.QWidget):
+class TimeSeriesExplorer(QtWidgets.QWidget):
     """napari_time_series_plotter main widget.
 
-    Contains the sub-widgets LayerSelector and VoxelPlotter and is meant to be docked to the napari viewer.
+    The TSPExplorer holds subwidgets for source and selection layer and options management and a MPL Canvas for time series plotting.
 
-    Attributes:
-        viewer : napari.Viewer
-        tabs : QtWidgets.QTabWidget
-        selector : napari_time_series_plotter.LayerSelector
-        plotter : napari_time_series_plotter.VoxelPlotter
+    Parameters
+    ----------
+    napari_viewer : napari.Viewer
+        Napari main viewer.
+
+    Attributes
+    ----------
+    _napari_viewer : napari.Viewer
+        Napari main viewer.
+    tabs : QtWidgets.QTabWidget
+        Tab widget containing the a TimeSeriesMPLWidget and an OptionsManager.
+    options : napari_time_series_plotter.widgets.OptionsManager
+        Widget for option managment.
+    model : napari_time_series_plotter.models.LayerSelectionModel
+        Model holding items for all valid source and selection layers.
+    selector : napari_time_series_plotter.widgets.LayerSelector
+        Tree view on a LayerSelectionModel.
+    plotter : napari_time_series_plotter.widgets.TimeSeriesMPLWidget
+        Widget for time series plotting.
     """
 
     def __init__(
-        self, napari_viewer, parent: Optional[QtWidgets.QWidget] = None
+        self, napari_viewer: Viewer, parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
         super().__init__(parent)
         self._napari_viewer = napari_viewer
 
         self._initUI()
-        self._connectEvents()
+        self._setUpSignals()
 
-    def _initUI(self):
-        # subwidgets
+    def _initUI(self) -> None:
+        """
+        Initialize UI widgets and set up layout.
+        """
+        # widgets
         self.tabs = QtWidgets.QTabWidget()
         self.options = OptionsManager()
         self.model = LayerSelectionModel(
             self._napari_viewer,
-            agg_func=self.options.plotter_options()["roi_mode"],
+            agg_func=self.options.get_ls_options()["shape_aggergation_mode"],
         )
         self.selector = LayerSelector(self.model)
         self.plotter = TimeSeriesMPLWidget(
-            self._napari_viewer, self.model, self.options.plotter_options()
+            self._napari_viewer, self.model, self.options.get_tp_options()
         )
-        self.tabs.addTab(self.plotter, "Plot")
+        self.tabs.addTab(self.plotter, "Plotter")
         self.tabs.addTab(self.options, "Options")
 
         # layout
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.tabs)
-        layout.addWidget(QtWidgets.QLabel("Layer Selector"))
+        layout.addWidget(QtWidgets.QLabel("Layer selection"))
         layout.addWidget(self.selector)
         self.setLayout(layout)
 
-    def _connectEvents(self):
-        # handle events
-        # self.selector.model().dataChanged.connect(self.plotter.update_layers)
+    def _setUpSignals(self):
+        """
+        Set up signal connections.
+        """
+        # update TimeSeriesMPLWidget upon option change.
         self.options.plotter_option_changed.connect(
             self.plotter.update_options
         )
-        self.options.plotter_option_changed.connect(
+        # update LayerSelector upon option change.
+        self.options.selector_option_changed.connect(
             lambda options: self.selector.source_model.setAggFunc(
-                options["roi_mode"]
+                options["shape_aggergation_mode"]
             )
         )
 
 
-# TODO: TSPInspector besseren namen finden
-class TSPInspector(QtWidgets.QWidget):
-    """napari_time_series_plotter widget for data inspection.
+class TimeSeriesTableView(QtWidgets.QWidget):
+    """napari_time_series_plotter widget to view time series in table form.
 
-    This widget can be docked to the viewer and displayes the currently selectes time series as a table.
-    The data can be exported as .csv file.
+    This widget displayes the currently extracted time series from the selected source and selection layers as a table.
+    The data can be exported to a .csv file.
 
-    Attributes:
-        viewer : napari.Viewer
-        table_view : Qt QTableView widget for data visualization
-        model : TSP DataTableModel object for storage of the active time series
+    Parameters
+    ---------
+    napari_viewer : napari.Viewer
+        Main napari viewer.
+    parent : qtpy.QtWidgets.QWidget
+        Parent widget:
+
+    Attributes
+    ---------
+    source_model : napari_time_series_plotter.models.LayerSelectionModel
+        Model providing time series data.
+    btn_copy : qtpy.QtWidgets.QPushButton
+        Button to copy the currently displayed table to the clipboard.
+    btn_export : qtpy.QtWidgets.QPushButton
+        Button to export the currently displayed table to a .csv file.
+    tableview : qtpy.QtWidgets.QTableView
+        Widget to display the extracted time series as a table.
+
+    Methods
+    -------
+    _initUI()
+        Initialize UI widgets and set up layout.
+    _setUpSignals()
+        Set up singal connections and callbacks.
+    _loadData()
+        Execute the model's update method.
+    _toClipboard()
+        Execute the model's toClipboard method.
+    _exportToCSV()
+        Execute the model's toCSV method.
     """
 
     dataChanged = QtCore.Signal()
 
     def __init__(
-        self, napari_viewer, parent: Optional[QtWidgets.QWidget] = None
+        self, napari_viewer: Viewer, parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
         super().__init__(parent)
-        self.viewer = napari_viewer
 
         # access main widget, initialize if not already docked
-        tspe_dock, tspe_widget = self.viewer.window.add_plugin_dock_widget(
-            "napari-time-series-plotter", "Explorer"
+        tspe_dock, tspe_widget = napari_viewer.window.add_plugin_dock_widget(
+            "napari-time-series-plotter", "TimeSeriesExplorer"
         )
         tspe_dock.setHidden(False)
-        self.model = tspe_widget.datatable
-        self.model.dataChanged.connect(self.dataChanged.emit)
+        self.source_model = tspe_widget.model
+        self.model = TimeSeriesTableModel(source=self.source_model)
 
-        # subwidgets
-        self.load_btn = QtWidgets.QPushButton()
-        self.load_btn.setText("Load from plot")
-        self.load_btn.clicked.connect(self._updateData)
-        self.copy_btn = QtWidgets.QPushButton()
-        self.copy_btn.setText("Selection to Clipboard")
-        self.copy_btn.clicked.connect(self._toClipboard)
-        self.export_btn = QtWidgets.QPushButton()
-        self.export_btn.setText("Selection to CSV file")
-        self.export_btn.clicked.connect(self._exportToCSV)
+        self._initUI()
+        self._setUpSignals()
+
+    def _initUI(self) -> None:
+        """
+        Initialize UI widgets and set up layout.
+        """
+        # widgets
+        self.btn_copy = QtWidgets.QPushButton()
+        self.btn_copy.setText("Selection to Clipboard")
+        self.btn_export = QtWidgets.QPushButton()
+        self.btn_export.setText("Selection to CSV file")
         self.tableview = QtWidgets.QTableView()
         self.tableview.setModel(self.model)
         self.tableview.setSelectionMode(4)
@@ -125,27 +158,35 @@ class TSPInspector(QtWidgets.QWidget):
         # layout
         layout = QtWidgets.QVBoxLayout()
         sublayout = QtWidgets.QHBoxLayout()
-        sublayout.addWidget(self.load_btn)
-        sublayout.addWidget(self.copy_btn)
-        sublayout.addWidget(self.export_btn)
+        sublayout.addStretch()
+        sublayout.addWidget(self.btn_copy)
+        sublayout.addWidget(self.btn_export)
         layout.addLayout(sublayout)
         layout.addWidget(self.tableview)
         self.setLayout(layout)
 
-    def _toClipboard(self):
+    def _setUpSignals(self) -> None:
         """
-        Private, execute the models toClipboard method.
+        Set up singal connections and callbacks.
+        """
+        # button signals
+        self.btn_copy.clicked.connect(self._copyToClipboard)
+        self.btn_export.clicked.connect(self._exportToCSV)
+
+        # source_model signals
+        self.source_model.dataChanged.connect(self.model.update())
+
+    def _copyToClipboard(self) -> None:
+        """
+        Execute the model's toClipboard method.
         """
         self.model.toClipboard(self.tableview.selectionModel())
 
-    def _exportToCSV(self):
+    def _exportToCSV(self) -> None:
         """
-        Private, execute the models toCSV method.
+        Execute the model's toCSV method.
         """
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save File")
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save table as")
         # if user defines save path save and return True, else skip saving and return False
         if path:
             self.model.toCSV(path, self.tableview.selectionModel())
-
-    def _updateData(self):
-        self.model.update()
