@@ -830,7 +830,7 @@ class TimeSeriesTableModel(QAbstractTableModel):
 
         Returns
         -------
-        rv : bool
+        bool
             True if data was updated successfull, else False.
         """
         # we need to bring all entries to the same length to support time series
@@ -841,10 +841,10 @@ class TimeSeriesTableModel(QAbstractTableModel):
                 data = align_value_length(data)
                 self._data = pd.DataFrame.from_dict(data)
                 self.layoutChanged.emit()
-                rv = True
+                return True
         except ValueError:
-            rv = False
-        return rv
+            pass
+        return False
 
     def rowCount(self, index: QModelIndex = ...) -> int:
         """
