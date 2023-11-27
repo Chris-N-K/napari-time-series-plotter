@@ -1,3 +1,6 @@
+"""
+This module contans the models and items of napari-time-series-plotter.
+"""
 import warnings
 from typing import (
     Any,
@@ -35,13 +38,6 @@ from .utils import (
 )
 
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
-
-__all__ = (
-    "SourceLayerItem",
-    "SelectionLayerItem",
-    "LayerSelectionModel",
-    "TimeSeriesTableModel",
-)
 
 
 class SourceLayerItem(QtGui.QStandardItem):
@@ -691,17 +687,15 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         self.dataChanged.emit(QModelIndex(), QModelIndex())
 
 
-# TODO: daten nicht mehr vom plotter holen sondern vom selection model
 class TimeSeriesTableModel(QAbstractTableModel):
-    """Subclass of QAbstractTableModel.
+    """Model for handling time series data as a table.
 
-    This class stores the data extracted from selected layers in a two dimensional, table like format.
-    The stored data can be displayed with a QtWidget.QTableView widget.
+    This class stores the time seires data extracted from selected source and selection layers in a two dimensional, table format.
 
     Attributes
     ----------
-    source : napari_matplotlib.base.NapariMPLWidget
-        Plotting widget to load data from.
+    source : napari_time_series_plotter.models.LayerSelectionModel
+        Model holding the time series data.
 
     Methods
     -------
@@ -725,87 +719,77 @@ class TimeSeriesTableModel(QAbstractTableModel):
 
     def __init__(
         self,
-        source: Optional[NapariMPLWidget] = None,
+        source: NapariMPLWidget,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self.source = source
         self._data = pd.DataFrame()
 
-    # currently not necessary
-    '''def setData(self, index: Union[QModelIndex, tuple], value: Union[int, float], role: Qt.ItemDataRole = Qt.EditRole) -> bool:
-        """Sets the role data for the item at index to value.
-
-        Returns true if successful; otherwise returns false.
-        The dataChanged() signal should be emitted if the data was successfully set.
-        Can handle tuple style index and QModelIndex.
-
-        :param index: index to write at as tuple (row, col) or QModelIndex
-        :param value: value to write at the given index
-        :param role: ItemDataRole describing what to do; default: EditRole
-        :return: true if successful, otherwise returns false
-        """
-        if role == Qt.EditRole:
-            if isinstance(index, tuple):  # handle tuple index
-                r, c = index
-            else:  # handle QModelIndex
-                r, c = index.row(), index.column()
-            try:
-                self._data.iloc[r, c] = value
-                return True
-            except:
-                return False
-        return False'''
-
     def data(
         self,
-        index: Union[QModelIndex, Tuple[int, ...]],
+        index: QModelIndex,
         role: Qt.ItemDataRole = Qt.DisplayRole,
     ) -> Union[str, QVariant]:
-        """Returns the data stored under the given role for the item referred to by the index.
+        """Return the data stored under the given role of the item at the given index.
 
-        :param index: index to write at as tuple (row, col) or QModelIndex
-        :param role: ItemDataRole describing what to do; default: EditRole
-        :return: value at given index
+        Parameters
+        ----------
+        index : qtpy.QtCore.QModelIndex
+            Index of the item to access.
+        role : qtpy.QtCore.Qt.ItemDataRole
+            Role of the data to access, default: qtpy.QtCore.Qt.DisplayRole
+
+        Returns
+        str | qtpy.QtCore.QVariant
+            String stored in the item at the given index under the given role.
         """
-        if role == Qt.DisplayRole:
-            if isinstance(index, tuple):  # handle tuple index
-                r, c = index
-            elif index.isValid():
-                r, c = index.row(), index.column()
-            else:
-                return QVariant()
+        if role == Qt.DisplayRole and index.isValid():
+            r, c = index.row(), index.column()
             return str(self._data.iloc[r, c])
         return QVariant()
 
-    # currently not necessary
-    '''def setHeaderData(self, section: int, orientation: Qt.Orientation, value: str, role: Qt.ItemDataRole = Qt.EditRole) -> bool:
-        """Sets the data for the given role and section in the header with the specified orientation to the value supplied.
+    def setHeaderData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        value: str,
+        role: Qt.ItemDataRole = Qt.EditRole,
+    ) -> bool:
+        """Sets the data for the given role and section of the header in the specified orientation.
 
-        Returns true if the header's data was updated; otherwise returns false.
+        Returns true if the header's data was updated; otherwise false.
 
-        :param section: section to write at
-        :param orientation: header orientation; horizontal -> col; vertical -> row
-        :param value: value to write at the given section
-        :param role: ItemDataRole describing what to do; default: EditRole
-        :return: true if successful, otherwise returns false
+        Parameters
+        ----------
+        section : int
+            Section to write in.
+        orientation : qtpy.QtCore.Qt.Orientation
+            Header orientation; horizontal -> col; vertical -> row.
+        value : str
+            Value to write at the given header section.
+        role : qtpy.QtCore.Qt.ItemDataRole.EditRole
+            ItemDataRole describing what to do; default: EditRole.
+        Returns
+        -------
+        bool
+            True if successful, otherwise False.
         """
         if role == Qt.EditRole:
-            if orientation == Qt.Horizontal:
-                try:
-                    self._data.rename(columns={self._data.columns[section], value})
+            try:
+                if orientation == Qt.Horizontal:
+                    self._data.rename(
+                        columns={self._data.columns[section]: value}
+                    )
                     return True
-                except:
-                    return False
-            elif orientation == Qt.Vertical:
-                try:
-                    index = self._data.index
+                elif orientation == Qt.Vertical:
+                    index = list(self._data.index)
                     index[section] = value
-                    self._data.set_index(index)
+                    self._data.set_index(pd.Index(index))
                     return True
-                except:
-                    return False
-        return False'''
+            except (LookupError, TypeError, ValueError):
+                pass
+        return False
 
     def headerData(
         self,
@@ -813,15 +797,24 @@ class TimeSeriesTableModel(QAbstractTableModel):
         orientation: Qt.Orientation,
         role: Qt.ItemDataRole = Qt.DisplayRole,
     ) -> Any:
-        """Returns the data for the given role and section in the header with the specified orientation.
+        """Return the data for the given role and section in the header in the specified orientation.
 
-        For horizontal headers, the section number corresponds to the column number. Similarly, for vertical headers,
+        For horizontal headers, the section number corresponds to the column number. For vertical headers,
         the section number corresponds to the row number.
 
-        :param section: section to write at
-        :param orientation: header orientation; horizontal -> col; vertical -> row
-        :param role: ItemDataRole describing what to do; default: EditRole
-        :return: value at given section and orientation
+        Parameters
+        ----------
+        section : int
+            Section to access.
+        orientation : qtpy.QtCore.Qt.Orientation
+            Header orientation; horizontal -> col; vertical -> row.
+        role:
+            ItemDataRole describing what to do; default: qtpy.QtCore.Qt.ItemDataRole.DisplayRole
+
+        Returns
+        -------
+        str | qtpy.QtCore.QVariant
+            Header value at given section and orientation.
         """
         if role == Qt.DisplayRole:
             if orientation == Qt.Horizontal:
@@ -830,19 +823,28 @@ class TimeSeriesTableModel(QAbstractTableModel):
                 return str(self._data.index[section])
         return QVariant()
 
-    def update(self):
-        """Update the underlying dataframe and emit a layoutChanged signal.
+    def update(self) -> bool:
+        """Update data from source.
 
-        :return: True if update was succesfull
+        The source model provides the time series as a dictionary, this must be converted to a dataframe.
+
+        Returns
+        -------
+        rv : bool
+            True if data was updated successfull, else False.
         """
         # we need to bring all entries to the same length to support time series
-        # from different image layers
-        if self.source:
-            data = align_value_length(self.source.data)
-            self._data = pd.DataFrame.from_dict(data)
-            self.layoutChanged.emit()
-            return True
-        return False
+        # from image layers of different shape
+        try:
+            data = self.source.tsData
+            if data:
+                data = align_value_length(data)
+                self._data = pd.DataFrame.from_dict(data)
+                self.layoutChanged.emit()
+                rv = True
+        except ValueError:
+            rv = False
+        return rv
 
     def rowCount(self, index: QModelIndex = ...) -> int:
         """
@@ -856,26 +858,33 @@ class TimeSeriesTableModel(QAbstractTableModel):
         """
         return len(self._data.columns)
 
-    def toClipboard(self, selectionModel: QItemSelectionModel) -> None:
+    def toClipboard(self, selection_model: QItemSelectionModel) -> None:
         """Copy selected data to clipboard.
-        If selectionModel has no selection copy whole dataframe.
+        If selection_model holds no selection copy whole dataframe.
 
-        :param selectionModel: QItemSelectionModel of parent QTableView
+        Parameters
+        ----------
+        selection_model : qtpy.QtCore.QItemSelectionModel
+            Model holding selected cells of a table view.
         """
-        idx = self._selection_to_pandas_iloc(selectionModel)
+        idx = self._selection_to_pandas_iloc(selection_model)
         if idx:  # if selection, copy selected data
             self._data.iloc[idx[0], idx[1]].to_clipboard()
         else:  # if no selection, copy whole dataframe
             self._data.to_clipboard()
 
-    def toCSV(self, path: str, selectionModel: QItemSelectionModel) -> None:
-        """Copy selected data to clipboard.
-        If selectionModel has no selection save whole dataframe to path.
+    def toCSV(self, path: str, selection_model: QItemSelectionModel) -> None:
+        """Export selected data to .csv file.
+        If selection_model holds no selection export whole dataframe.
 
-        :param path: Save path
-        :param selectionModel: QItemSelectionModel of parent QTableView
+        Parameters
+        ----------
+        path : str
+            File path to export to.
+        selection_model : qtpy.QtCore.QItemSelectionModel
+            Model holding selected cells of a table view.
         """
-        idx = self._selection_to_pandas_iloc(selectionModel)
+        idx = self._selection_to_pandas_iloc(selection_model)
         if idx:  # if selection, copy selected data
             self._data.iloc[idx[0], idx[1]].to_csv(path)
         else:  # if no selection, copy whole dataframe
@@ -883,17 +892,24 @@ class TimeSeriesTableModel(QAbstractTableModel):
 
     @staticmethod
     def _selection_to_pandas_iloc(
-        selectionModel: QItemSelectionModel,
-    ) -> Union[Tuple, Tuple[Any, Any]]:
-        """Extract a selection from a QItemSelectionModel and convert to an index compatible with pandas DataFrame.iloc method.
+        selection_model: QItemSelectionModel,
+    ) -> Tuple[Any, ...]:
+        """Extract a selection from a QItemSelectionModel and convert it to an index compatible with pandas' DataFrame.iloc method.
 
-        :param selectionModel: selection model of an QTableView
-        :return: pandas DataFrame.iloc compatiple index lists or slices, as tuple of lists of row indices and column indices
+        Parameters
+        ----------
+        selection_model : qtpy.QtCore.QItemSelectionModel
+            Model holding selected cells of a table view.
+
+        Returns
+        -------
+        tuple
+            pandas DataFrame.iloc compatiple index as a tuple.
         """
         # translate selection into row and column indices
-        selected_rows = [idx.row() for idx in selectionModel.selectedRows()]
+        selected_rows = [idx.row() for idx in selection_model.selectedRows()]
         selected_cols = [
-            idx.column() for idx in selectionModel.selectedColumns()
+            idx.column() for idx in selection_model.selectedColumns()
         ]
         if (
             not selected_rows and selected_cols
@@ -908,7 +924,7 @@ class TimeSeriesTableModel(QAbstractTableModel):
                 zip(
                     *[
                         (idx.row(), idx.column())
-                        for idx in selectionModel.selectedIndexes()
+                        for idx in selection_model.selectedIndexes()
                     ]
                 )
             )
