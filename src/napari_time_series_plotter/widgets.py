@@ -174,7 +174,7 @@ class TimeSeriesMPLWidget(BaseNapariMPLWidget):
         with mplstyle.context(self.mpl_style_sheet_path):
             self.axes.clear()
             self._info_text = self.axes.annotate(
-                "Select source (image) and selection layers (points, shapes)\nto plot time series or\nmove the mouse over the canvas while holding 'shift'\nto live plotting selected source layers.",
+                "Select source (image) and selection layers (points, shapes)\nto plot time series or\nmove the mouse over the viewer while holding 'shift'\nto live plot selected source layers.",
                 (0.5, 0.5),
                 ha="center",
                 va="center",
