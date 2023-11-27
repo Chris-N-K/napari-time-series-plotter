@@ -1,5 +1,5 @@
 name: napari-time-series-plotter
-display_name: TSP
+display_name: TimeSeriesPlotter
 schema_version: 0.1.0
 contributions:
   commands:

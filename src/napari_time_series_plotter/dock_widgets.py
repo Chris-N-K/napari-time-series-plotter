@@ -86,6 +86,7 @@ class TimeSeriesExplorer(QtWidgets.QWidget):
         )
 
 
+# TODO: add button tooltips
 class TimeSeriesTableView(QtWidgets.QWidget):
     """napari_time_series_plotter widget to view time series in table form.
 
@@ -174,7 +175,7 @@ class TimeSeriesTableView(QtWidgets.QWidget):
         self.btn_export.clicked.connect(self._exportToCSV)
 
         # source_model signals
-        self.source_model.dataChanged.connect(self.model.update())
+        self.source_model.dataChanged.connect(self.model.update)
 
     def _copyToClipboard(self) -> None:
         """
