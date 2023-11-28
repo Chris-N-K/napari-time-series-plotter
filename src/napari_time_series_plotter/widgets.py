@@ -278,10 +278,12 @@ class TimeSeriesMPLWidget(BaseNapariMPLWidget):
             self.clear()
 
     def update_options(self, options_dict: Dict[str, Any]) -> None:
-        """Update attributes based on input.
-        After setting the attributes to new values the 'set_mode' and '_draw' methods are called to compute changes.
+        """Update attributes based on input and redraw plot.
 
-        :param options_dict: Dictionary containing new attribute values
+        Parameters
+        ----------
+        options_dict : Dict[str, Any]
+            Dictionary containing new attribute values
         """
         self.figure_title = options_dict["figure_title"]
         self.x_axis_label = options_dict["x_axis_label"]
