@@ -281,23 +281,13 @@ class SelectionLayerItem(QtGui.QStandardItem):
 
         return indices
 
-    def _extract_ts_data(self) -> npt.NDArray:
+    def _extract_ts_data(self) -> List[npt.NDArray]:
         """
         Extract time sereis data from layer of parent item.
         """
         source_layer = self._parent.data(Qt.UserRole + 2)
-        ts_data = []
-        for idx in self._indices:
-            data = source_layer.data[idx]
-            if (
-                self._layer._type_string == "shapes"
-                and self.model()
-                and self.model().aggFunc
-            ):
-                data = self.model().aggFunc()(data, axis=1)
-            ts_data.append(data)
-
-        return np.array(ts_data)
+        ts_data = [source_layer.data[idx] for idx in self._indices]
+        return ts_data
 
     def data(self, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole) -> object:
         """
@@ -355,7 +345,7 @@ class SelectionLayerItem(QtGui.QStandardItem):
         Update the stored time series indices and if the indices changed time series data.
         """
         new_indices = self._extract_indices()
-        if ~np.array_equal(new_indices, self._indices):
+        if not self._indices or not np.array_equal(new_indices, self._indices):
             self._indices = new_indices
             self.updateTSData()
 
@@ -378,7 +368,7 @@ class LivePlotItem(QtGui.QStandardItem):
         self.setEditable(False)
         self.setCheckable(False)
 
-    def _extract_ts_data(self) -> npt.NDArray:
+    def _extract_ts_data(self) -> List[npt.NDArray]:
         """
         Extract time sereis data from all selected source layers.
         """
@@ -394,7 +384,7 @@ class LivePlotItem(QtGui.QStandardItem):
                     if idx:
                         data = source_layer.data[idx[0]]
                         ts_data.append(data)
-        return np.array(ts_data)
+        return ts_data
 
     def data(self, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole) -> object:
         """
@@ -459,8 +449,8 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
     ----------
     _layer_list : napari.components.layerlist.LayerList
         Napari LayerList containing the layers of the napari main viewer.
-    _agg_func : callable | None
-        Aggregation function for time series data or None.
+    _agg_func : callable
+        Aggregation function for time series data.
     tsData : dict of str and np.ndarray
         Dictionary containing all extracted time series. Keys are generated
         from the source and selection layer names and the index of the
@@ -485,7 +475,7 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
     def __init__(
         self,
         napari_viewer: napari.Viewer,
-        agg_func: Optional[Callable] = None,
+        agg_func: Callable,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -539,6 +529,7 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
                         0,
                         SelectionLayerItem(layer, item),
                     )
+        self.dataChanged.emit(item.index(), item.index())
 
     def _layer_removed_callback(
         self, event: napari.utils.events.Event
@@ -564,6 +555,7 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
                 if item.hasChildren():
                     for child in item.findChildren(layer.name):
                         item.removeRow(child.index().row())
+        self.dataChanged.emit(QModelIndex(), QModelIndex())
 
     def _mouse_move_callback(
         self, viewer: napari.Viewer, event: napari.utils.events.Event
@@ -596,10 +588,17 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         layer_list : napari.components.layerlist.LayerList
             Napari LayerList containing the layers of the napari main viewer.
         """
+        self.blockSignals(True)
         self.clear()
+        # initialize item for live plotting
+        live_plot = LivePlotItem()
+        self._layer_list.events.removed.connect(
+            lambda event: live_plot.updateTSData()
+        )
+
+        # initialize items for source and selection layres
         source_items = []
         selection_layers = []
-
         for layer in layer_list:
             if (
                 layer._type_string == "image"
@@ -618,7 +617,8 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
                     if layer.ndim >= item.data(role=Qt.UserRole + 2).ndim - 1
                 ][::-1]
             )
-        self.insertColumn(0, source_items[::-1] + [LivePlotItem()])
+        self.insertColumn(0, [*source_items[::-1], live_plot])
+        self.blockSignals(False)
         self.dataChanged.emit(QModelIndex(), QModelIndex())
 
     @property
@@ -644,18 +644,18 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
             elif item.isChecked() and item.hasChildren():
                 for child in item.children():
                     if child.isChecked():
-                        item_ts_data = {
-                            f"{child.data(Qt.UserRole + 5)}_{idx}": ts
-                            for idx, ts in enumerate(
-                                child.data(Qt.UserRole + 4)
-                            )
-                        }
-                    else:
-                        item_ts_data = {}
-                    ts_data.update(item_ts_data)
+                        for idx, ts in enumerate(child.data(Qt.UserRole + 4)):
+                            if ts.size != 0:
+                                ts_data[
+                                    f"{child.data(Qt.UserRole + 5)}_{idx}"
+                                ] = (
+                                    ts
+                                    if child.data(Qt.UserRole + 1) == "points"
+                                    else self._agg_func(ts, axis=1)
+                                )
         return ts_data
 
-    def aggFunc(self) -> Union[Callable, None]:
+    def aggFunc(self) -> Callable:
         """Return the time series aggregation function.
 
         Returns
@@ -665,7 +665,7 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
         """
         return self._agg_func
 
-    def setAggFunc(self, func: Union[Callable, None]) -> None:
+    def setAggFunc(self, func: Callable) -> None:
         """Set the time series data aggregation function and update all time series data.
 
         The function must e a numpy function capable of collapsing a dimensions such as:
@@ -980,5 +980,7 @@ class ItemTypeFilterProxyModel(QSortFilterProxyModel):
         Returns True if the item in the row indicated by the given source_row and
         source_parent should be included in the model; otherwise returns False.
         """
+        if sourceParent.isValid():
+            return True
         item = self.sourceModel().item(sourceRow, 0)
         return item.type() != self._ftype
