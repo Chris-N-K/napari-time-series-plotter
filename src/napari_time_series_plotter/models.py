@@ -40,11 +40,106 @@ from .utils import (
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
 
-class SourceLayerItem(QtGui.QStandardItem):
+class LayerItem(QtGui.QStandardItem):
+    """Base class for layer items in a LayerSelectionModel.
+
+    A layer item is checkable and holds a refference to its parent napari layer.
+    The displayed text of the item is bound to the parent layer name and updates
+    with it.
+
+    Parameters
+    ----------
+    layer : napari.layers.Image
+        Parent napari layer.
+
+    Attributes
+    ----------
+    _layer : napari.layers.Image
+        Parent napari layer.
+
+    Methods
+    -------
+    _theme_changed_callback(event=napari.utils.events.Event)
+        Change icon and foreground color upon theme change.
+    data(role=Qt.ItemDataRole)
+        Overload of the QStandardItem.data() method. The method adds functionality
+        for the Qt.DisplayRole to display the name of the connected napari layer and
+        to return additional data.
+    flags()
+        Return item flags.
+    isChecked()
+        Return True if check state is Qt.Checked, else False.
+    """
+
+    def __init__(self, layer: napari.layers.Image, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._layer = layer
+
+        theme = napari.utils.theme.get_theme(
+            napari.current_viewer().theme, as_dict=False
+        )
+        icon = QtGui.QIcon()
+        icon.addFile(
+            f"{napari.utils._appdirs.user_cache_dir()}/_themes/{theme.id}/new_{self._layer._type_string}.svg"
+        )
+        self.setIcon(icon)
+        self.setForeground(QtGui.QColor(theme.text.as_hex()))
+        self.setEditable(False)
+        self.setCheckable(True)
+
+        napari.current_viewer().events.theme.connect(
+            self._theme_changed_callback
+        )
+
+    def _theme_changed_callback(self, event: napari.utils.events.Event):
+        """
+        Change icon and foreground color upon theme change.
+        """
+        theme = napari.utils.theme.get_theme(event.value, as_dict=False)
+        icon = QtGui.QIcon()
+        icon.addFile(
+            f"{napari.utils._appdirs.user_cache_dir()}/_themes/{theme.id}/new_{self._layer._type_string}.svg"
+        )
+        self.setIcon(icon)
+        self.setForeground(QtGui.QColor(theme.text.as_hex()))
+
+    def data(self, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole) -> Any:
+        """
+        Return the data stored under role.
+        """
+        if role == Qt.DisplayRole:
+            return self._layer.name
+        if role == Qt.UserRole + 1:
+            return self._layer._type_string
+        if role == Qt.UserRole + 2:
+            return self._layer
+        return super().data(role)
+
+    def flags(self) -> Qt.ItemFlags:
+        """
+        Return item flags.
+        """
+        item_flags = (
+            super().flags()
+            & ~Qt.ItemIsEditable
+            & ~Qt.ItemIsDragEnabled
+            & ~Qt.ItemIsDropEnabled
+        )
+        return item_flags
+
+    def isChecked(self) -> bool:
+        """
+        Return True if check state is Qt.Checked, else False.
+        """
+        if self.checkState() == Qt.Checked:
+            return True
+        return False
+
+
+class SourceLayerItem(LayerItem):
     """Item class for LayerSelectionModel representing a source layer.
-    This item is checkable and holds a refference to its parent napari layer.
-    The displayable text of the item is bound to the parent layer name and updates
-    with it. This item can have SelectionLayerItems as children.
+
+    This item can have SelectionLayerItems as children.
 
     Parameters
     ----------
@@ -76,40 +171,7 @@ class SourceLayerItem(QtGui.QStandardItem):
     """
 
     def __init__(self, layer: napari.layers.Image, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._layer = layer
-
-        icon = QtGui.QIcon()
-        icon.addFile(
-            f"{napari.utils._appdirs.user_cache_dir()}/_themes/{napari.current_viewer().theme}/new_{self._layer._type_string}.svg"
-        )
-        self.setIcon(icon)
-        self.setEditable(False)
-        self.setCheckable(True)
-
-    def data(self, role: Optional[Qt.ItemDataRole] = Qt.DisplayRole) -> Any:
-        """
-        Return the data stored under role.
-        """
-        if role == Qt.DisplayRole:
-            return self._layer.name
-        if role == Qt.UserRole + 1:
-            return self._layer._type_string
-        if role == Qt.UserRole + 2:
-            return self._layer
-        return super().data(role)
-
-    def flags(self) -> Qt.ItemFlags:
-        """
-        Return item flags.
-        """
-        item_flags = (
-            super().flags()
-            & ~Qt.ItemIsEditable
-            & ~Qt.ItemIsDragEnabled
-            & ~Qt.ItemIsDropEnabled
-        )
-        return item_flags
+        super().__init__(layer, *args, **kwargs)
 
     def type(self) -> int:
         """
@@ -131,21 +193,11 @@ class SourceLayerItem(QtGui.QStandardItem):
         """
         return [child for child in self.children() if child.data(role) == data]
 
-    def isChecked(self) -> bool:
-        """
-        Return True if check state is Qt.Checked, else False.
-        """
-        if self.checkState() == Qt.Checked:
-            return True
-        return False
 
-
-class SelectionLayerItem(QtGui.QStandardItem):
+class SelectionLayerItem(LayerItem):
     """Item class for LayerSelectionModel representing a selection layer.
-    This item is checkable and holds a refference to its parent napari layer.
-    The displayable text of the item is bound to the parent layer name and updates
-    with it. This item can have SelectionLayerItems as children.
 
+    This item can have SelectionLayerItems as children.
     Additionally it holds the time series indices extracted from its parent layer
     and the time series data extracted from the parent item's source layer.
 
@@ -158,8 +210,6 @@ class SelectionLayerItem(QtGui.QStandardItem):
 
     Attributes
     ----------
-    _layer : napari.layers.Points | napari.layer.Shapes
-        Parent napari layer.
     _parent : SourceLayerItem
         Parent item.
     _indices : tuple of np.ndarray
@@ -173,12 +223,8 @@ class SelectionLayerItem(QtGui.QStandardItem):
 
     Methods
     -------
-    __del__()
-        Run cleanup upon deletion.
     _connect_callbacks()
         Connect event callbacks.
-    _disconnect_callbacks()
-        Disconnect event callbacks.
     _extract_indices()
         Extract time series indices from parent layer.
     _extract_ts_data()
@@ -194,8 +240,6 @@ class SelectionLayerItem(QtGui.QStandardItem):
         Return item type.
     parent()
         Return parent item.
-    isChecked()
-        Return True if check state is Qt.Checked, else False.
     updateTSIndices()
         Update the time series indices of the item.
     updateTSData()
@@ -209,7 +253,7 @@ class SelectionLayerItem(QtGui.QStandardItem):
         *args,
         **kwargs,
     ) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(layer, *args, **kwargs)
         if layer._type_string not in ["points", "shapes"]:
             raise ValueError(
                 f"layer must be of type Points or Shapes, is of type {type(layer)}"
@@ -219,28 +263,11 @@ class SelectionLayerItem(QtGui.QStandardItem):
                 "layer must not be more than one dimension smaller than parent item layer."
             )
 
-        self._layer = layer
         self._parent = parent
         self._indices = self._extract_indices()
         self._ts_data = self._extract_ts_data()
         self._pl_ec = None
         self._pil_ec = None
-
-        icon = QtGui.QIcon()
-        icon.addFile(
-            f"{napari.utils._appdirs.user_cache_dir()}/_themes/{napari.current_viewer().theme}/new_{self._layer._type_string}.svg"
-        )
-        self.setIcon(icon)
-        self.setEditable(False)
-        self.setCheckable(True)
-
-        self._connect_callbacks()
-
-    def __del__(self) -> None:
-        """
-        Run cleanup upon deletion.
-        """
-        self._disconnect_callbacks()
 
     def _connect_callbacks(self) -> None:
         """
@@ -252,17 +279,6 @@ class SelectionLayerItem(QtGui.QStandardItem):
         self._pil_ec = self._parent.data(Qt.UserRole + 2).events.data.connect(
             lambda event: self.updateTSData()
         )
-
-    def _disconnect_callbacks(self) -> None:
-        """
-        Disconnect event callbacks.
-        """
-        if self._pl_ec is not None:
-            self._layer.events.data.disconnect(self._pl_ec)
-        if self._pil_ec is not None:
-            self._parent.data(Qt.UserRole + 2).events.data.disconnect(
-                self._pil_ec
-            )
 
     def _extract_indices(self) -> List[Tuple[Any, ...]]:
         """
@@ -293,13 +309,7 @@ class SelectionLayerItem(QtGui.QStandardItem):
         """
         Return the data stored under role.
         """
-        if role == Qt.DisplayRole:
-            return self._layer.name
-        elif role == Qt.UserRole + 1:
-            return self._layer._type_string
-        elif role == Qt.UserRole + 2:
-            return self._layer
-        elif role == Qt.UserRole + 3:
+        if role == Qt.UserRole + 3:
             return self._indices
         elif role == Qt.UserRole + 4:
             return self._ts_data
@@ -311,13 +321,7 @@ class SelectionLayerItem(QtGui.QStandardItem):
         """
         Return item flags.
         """
-        item_flags = (
-            super().flags()
-            & ~Qt.ItemIsEditable
-            & ~Qt.ItemIsDragEnabled
-            & ~Qt.ItemIsDropEnabled
-            & Qt.ItemNeverHasChildren
-        )
+        item_flags = super().flags() & Qt.ItemNeverHasChildren
         return item_flags
 
     def type(self) -> int:
@@ -331,14 +335,6 @@ class SelectionLayerItem(QtGui.QStandardItem):
         Return parent item.
         """
         return self._parent
-
-    def isChecked(self) -> bool:
-        """
-        Return True if check state is Qt.Checked, else False.
-        """
-        if self.checkState() == Qt.Checked:
-            return True
-        return False
 
     def updateTSIndices(self) -> None:
         """
@@ -518,6 +514,7 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
             ]
             item.insertColumn(0, child_items)
             self.insertRow(0, item)
+            self.dataChanged.emit(item.index(), item.index())
         elif layer._type_string in ["points", "shapes"]:
             for row in range(self.rowCount()):
                 item = self.item(row, 0)
@@ -529,7 +526,7 @@ class LayerSelectionModel(QtGui.QStandardItemModel):
                         0,
                         SelectionLayerItem(layer, item),
                     )
-        self.dataChanged.emit(item.index(), item.index())
+            self.dataChanged.emit(item.index(), item.index())
 
     def _layer_removed_callback(
         self, event: napari.utils.events.Event
