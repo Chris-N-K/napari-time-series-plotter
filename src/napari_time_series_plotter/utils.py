@@ -9,9 +9,26 @@ from typing import (
     Tuple,
 )
 
+import napari
 import napari.layers.shapes._shapes_utils as shape_utils
 import numpy as np
 import numpy.typing as npt
+from napari.utils.theme import get_theme
+from qtpy.QtCore import (
+    QModelIndex,
+    Qt,
+)
+from qtpy.QtGui import (
+    QColor,
+    QPainter,
+)
+from qtpy.QtWidgets import (
+    QApplication,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QWidget,
+)
 from skimage.draw import line, polygon
 
 
@@ -189,3 +206,67 @@ def align_value_length(
             pval = val
         matched[key] = pval
     return matched
+
+
+class ViewItemDelegate(QStyledItemDelegate):
+    """ItemDelegate to style LayerSelector items.
+
+    Only if a napari.Viewer instance is present customization is executed.
+    The delegate customizes the checkbox to match the viewer text color.
+
+    Parameters
+    ----------
+    parent : qtpy.QtWidgets.QWidget
+        Parent widget.
+
+    Methods
+    -------
+    paint(painter=QPainter, option=QStyleOptionViewItem, index=QModelIndex)
+        Renders the delegate using the given painter and style option for the item specified by index.
+    """
+
+    def __init__(self, parent: QWidget = None) -> None:
+        super().__init__(parent=parent)
+
+    def paint(
+        self,
+        painter: QPainter,
+        option: QStyleOptionViewItem,
+        index: QModelIndex,
+    ) -> None:
+        """Renders the delegate using the given painter and style option for the item specified by index.
+
+        Parameters
+        ----------
+        painter: QPainter
+            Painter to draw the item.
+        option: QStyleOptionViewItem
+            Options defining the item style.
+        index: QModelIndex
+            Item index.
+        """
+        super().paint(painter, option, index)
+        viewer = napari.current_viewer()
+        if viewer:
+            self.initStyleOption(option, index)
+            painter.setPen(
+                QColor(get_theme(viewer.theme, as_dict=False).text.as_hex())
+            )
+
+            widget = option.widget
+            style = widget.style() if widget else QApplication.style()
+            check_rect = style.subElementRect(
+                QStyle.SubElement.SE_ItemViewItemCheckIndicator,
+                option,
+                widget,
+            )
+            if index.data(Qt.ItemDataRole.CheckStateRole) == Qt.Checked:
+                painter.drawRect(check_rect)
+                style.drawPrimitive(
+                    QStyle.PrimitiveElement.PE_IndicatorCheckBox,
+                    option,
+                    painter,
+                    widget,
+                )
+            else:
+                painter.drawRect(check_rect)

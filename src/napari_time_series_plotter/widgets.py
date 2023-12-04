@@ -17,6 +17,7 @@ from napari_matplotlib.base import BaseNapariMPLWidget
 from qtpy import QtCore, QtWidgets
 
 from .models import ItemTypeFilterProxyModel, LayerSelectionModel
+from .utils import ViewItemDelegate
 
 
 class LayerSelector(QtWidgets.QTreeView):
@@ -58,6 +59,7 @@ class LayerSelector(QtWidgets.QTreeView):
             QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred
         )
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.setItemDelegate(ViewItemDelegate())
 
 
 class TimeSeriesMPLWidget(BaseNapariMPLWidget):
@@ -346,8 +348,8 @@ class OptionsManager(QtWidgets.QWidget):
     selector_option_changed = QtCore.Signal(dict)
     plotter_option_changed = QtCore.Signal(dict)
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, parent: QtWidgets.QWidget = None) -> None:
+        super().__init__(parent=parent)
         self._shape_aggregation_modes = {
             "max": np.max,
             "mean": np.mean,
