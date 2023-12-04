@@ -203,7 +203,7 @@ class SelectionLayerItem(LayerItem):
 
     Parameters
     ----------
-    layer : napari.layers.Layer
+    layer : napari.layers.points.Points | napari.layers.shapes.Shapes
         Parent napari layer.
     parent : SourceLayerItem
         Parent item.
@@ -248,7 +248,7 @@ class SelectionLayerItem(LayerItem):
 
     def __init__(
         self,
-        layer,
+        layer: Union[napari.layers.points.Points, napari.layers.shapes.Shapes],
         parent: SourceLayerItem,
         *args,
         **kwargs,
@@ -268,6 +268,8 @@ class SelectionLayerItem(LayerItem):
         self._ts_data = self._extract_ts_data()
         self._pl_ec = None
         self._pil_ec = None
+
+        self._connect_callbacks()
 
     def _connect_callbacks(self) -> None:
         """
